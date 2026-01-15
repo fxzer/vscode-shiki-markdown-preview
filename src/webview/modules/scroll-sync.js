@@ -1,42 +1,262 @@
 /**
- * 滚动同步管理器 - 基于状态锁的实现
- * 核心思想：单一状态锁 + 事件源驱动 + 防抖处理
+ * 基于 Intersection Observer 的滚动同步管理器
+ * 核心优势：
+ * - 零 DOM 遍历，性能极佳
+ * - 浏览器原生优化，不会触发强制同步布局
+ * - 直接使用行号同步，精确且高效
+ * - 代码简洁，易于维护
  */
-class ScrollSyncManager {
+class IntersectionBasedScrollSync {
   constructor() {
-    // 单一状态锁 - 核心机制
+    // 跟踪当前可见的元素及其行号
+    this.visibleElements = new Map()
+    this.currentTopLine = 0
+    
+    // 状态管理
     this.isSyncing = false
     this.syncSource = null
-    this.lastEvent = null
-    this.syncTimeout = null
-    this.scrollEndTimeout = null
     this.isEnabled = true
-
-    // 防抖和性能优化参数
-    this.DEBOUNCE_MS = 16 // 约60fps，平衡响应性和性能
-    this.MIN_PERCENT_DIFF = 0.005 // 0.5%的最小变化，避免微动
-    this.SYNC_BLOCK_MS = 50 // 同步阻塞时间，防止循环
-    this.SCROLL_END_MS = 150 // 滚动结束检测时间
-    this.FAST_SCROLL_THRESHOLD = 0.02 // 快速滚动阈值
-
-    // 其他属性
-    this.lastPercent = 0
-    this.resizeObserver = null
-
-    // 性能优化相关属性
-    this._cachedHeight = null
-    this._lastHeightCheck = null
-    this._scrollRAF = null
-
+    
+    // 性能优化参数
+    this.SYNC_BLOCK_MS = 30 // 同步阻塞时间
+    this.SCROLL_DEBOUNCE_MS = 16 // 滚动防抖时间（约60fps）
+    
+    // 定时器
+    this.syncTimeout = null
+    this.scrollTimeout = null
+    
     this.init()
   }
 
   init() {
-    // 监听滚动事件，使用 requestAnimationFrame 优化性能
+    // 配置 Intersection Observer
+    // rootMargin 用于忽略顶部和底部 10% 的区域，只关注主要可见内容
+    this.observer = new IntersectionObserver(
+      this.handleIntersection.bind(this),
+      {
+        threshold: [0, 0.25, 0.5, 0.75, 1.0], // 多个阈值，更精确地跟踪可见性
+        rootMargin: '-10% 0px -10% 0px' // 忽略边缘元素，关注核心内容
+      }
+    )
+    
+    // 等待 DOM 加载完成后观察元素
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.observeElements())
+    } else {
+      this.observeElements()
+    }
+    
+    // 监听用户滚动 - 使用 passive 提升性能
     window.addEventListener('scroll', this.handleScroll.bind(this), { passive: true })
+    
+    // 监听来自扩展的消息
+    window.addEventListener('message', this.handleMessage.bind(this))
+  }
 
-    // 监听内容高度变化，应对图片加载等情况
-    this.setupResizeObserver()
+  /**
+   * 观察所有带 data-line 的元素
+   */
+  observeElements() {
+    const elements = document.querySelectorAll('[data-line]')
+    if (elements.length === 0) {
+      console.warn('[ScrollSync] 未找到带 data-line 属性的元素')
+      return
+    }
+    
+    elements.forEach(el => this.observer.observe(el))
+    console.log(`[ScrollSync] 开始观察 ${elements.length} 个元素`)
+  }
+
+  /**
+   * 处理 Intersection Observer 回调
+   * 自动更新可见元素映射
+   */
+  handleIntersection(entries) {
+    entries.forEach(entry => {
+      const lineNumber = parseInt(entry.target.dataset.line)
+      
+      if (entry.isIntersecting) {
+        // 元素进入视口
+        this.visibleElements.set(lineNumber, {
+          element: entry.target,
+          ratio: entry.intersectionRatio,
+          top: entry.boundingClientRect.top,
+          bottom: entry.boundingClientRect.bottom
+        })
+      } else {
+        // 元素离开视口
+        this.visibleElements.delete(lineNumber)
+      }
+    })
+  }
+
+  /**
+   * 处理用户滚动事件
+   */
+  handleScroll() {
+    if (!this.isEnabled) return
+    
+    // 如果是编辑器触发的同步，忽略
+    if (this.isSyncing && this.syncSource === 'editor') {
+      return
+    }
+    
+    // 使用 requestAnimationFrame 代替 setTimeout，性能更好
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout)
+    }
+    
+    // 立即同步一次，然后使用防抖处理后续滚动
+    if (!this.scrollTimeout) {
+      this.syncScrollToEditor()
+    }
+    
+    this.scrollTimeout = setTimeout(() => {
+      this.scrollTimeout = null
+      this.syncScrollToEditor()
+    }, this.SCROLL_DEBOUNCE_MS)
+  }
+
+  /**
+   * 同步滚动位置到编辑器
+   */
+  syncScrollToEditor() {
+    const topLine = this.getTopVisibleLine()
+    
+    if (topLine !== null && topLine !== this.currentTopLine) {
+      this.currentTopLine = topLine
+      console.log(`[ScrollSync] 预览滚动到行 ${topLine}`)
+      this.sendScrollMessage(topLine)
+    }
+  }
+
+  /**
+   * 获取最顶部的可见行号
+   * 返回当前视口顶部最接近的元素行号
+   */
+  getTopVisibleLine() {
+    if (this.visibleElements.size === 0) return null
+    
+    let topLine = null
+    let minTop = Infinity
+    
+    // 找到距离视口顶部最近的元素
+    for (const [lineNumber, info] of this.visibleElements) {
+      // 只考虑在视口上半部分的元素
+      if (info.top >= 0 && info.top < minTop) {
+        minTop = info.top
+        topLine = lineNumber
+      }
+    }
+    
+    return topLine
+  }
+
+  /**
+   * 发送滚动消息到编辑器
+   */
+  sendScrollMessage(line) {
+    this.isSyncing = true
+    this.syncSource = 'preview'
+    
+    const startTime = performance.now()
+    
+    if (window.vscode && window.vscode.postMessage) {
+      window.vscode.postMessage({
+        command: 'previewScrolledToLine',
+        line: line
+      })
+      console.log(`[ScrollSync] 发送消息耗时: ${(performance.now() - startTime).toFixed(2)}ms`)
+    } else {
+      console.error('[ScrollSync] vscode API 不可用')
+    }
+    
+    // 设置状态释放定时器
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout)
+    }
+    
+    this.syncTimeout = setTimeout(() => {
+      this.isSyncing = false
+      this.syncSource = null
+    }, this.SYNC_BLOCK_MS)
+  }
+
+  /**
+   * 处理来自扩展的消息
+   */
+  handleMessage(event) {
+    const message = event.data
+    
+    switch (message.command) {
+      case 'syncScrollToLine':
+        this.scrollToLine(message.line)
+        break
+      case 'updateScrollSyncState':
+        if (message.enabled) {
+          this.enable()
+        } else {
+          this.disable()
+        }
+        break
+      case 'updateContent':
+        // 内容更新时重新观察元素
+        this.reobserveElements()
+        break
+    }
+  }
+
+  /**
+   * 滚动到指定行号
+   */
+  scrollToLine(line) {
+    if (!this.isEnabled) return
+    
+    // 如果是预览触发的同步，忽略
+    if (this.isSyncing && this.syncSource === 'preview') {
+      return
+    }
+    
+    const element = document.querySelector(`[data-line="${line}"]`)
+    if (!element) {
+      console.warn(`[ScrollSync] 未找到行号 ${line} 对应的元素`)
+      return
+    }
+    
+    this.isSyncing = true
+    this.syncSource = 'editor'
+    this.currentTopLine = line
+    
+    // 使用 scrollIntoView 滚动到元素
+    // behavior: instant 避免动画延迟
+    element.scrollIntoView({
+      behavior: 'instant',
+      block: 'start'
+    })
+    
+    // 设置状态释放定时器
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout)
+    }
+    
+    this.syncTimeout = setTimeout(() => {
+      this.isSyncing = false
+      this.syncSource = null
+    }, this.SYNC_BLOCK_MS)
+  }
+
+  /**
+   * 重新观察元素（内容更新时）
+   */
+  reobserveElements() {
+    // 断开旧的观察
+    this.observer.disconnect()
+    this.visibleElements.clear()
+    
+    // 稍微延迟后重新观察，等待 DOM 更新完成
+    setTimeout(() => {
+      this.observeElements()
+    }, 100)
   }
 
   /**
@@ -44,6 +264,7 @@ class ScrollSyncManager {
    */
   enable() {
     this.isEnabled = true
+    console.log('[ScrollSync] 已启用')
   }
 
   /**
@@ -51,410 +272,58 @@ class ScrollSyncManager {
    */
   disable() {
     this.isEnabled = false
-    // 清理当前状态
     this.isSyncing = false
     this.syncSource = null
+    
     if (this.syncTimeout) {
       clearTimeout(this.syncTimeout)
       this.syncTimeout = null
     }
-    if (this.scrollEndTimeout) {
-      clearTimeout(this.scrollEndTimeout)
-      this.scrollEndTimeout = null
+    
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout)
+      this.scrollTimeout = null
     }
+    
+    console.log('[ScrollSync] 已禁用')
   }
 
   /**
-   * 处理滚动事件 - 基于状态锁的实现
-   */
-  handleScroll() {
-    // 快速检查是否启用
-    if (!this.isEnabled)
-      return
-    // 状态锁检查：如果正在同步且来源是编辑器，忽略事件
-    if (this.isSyncing && this.syncSource === 'editor') {
-      return
-    }
-
-    // 使用防抖机制减少处理频率
-    if (this._scrollRAF) {
-      cancelAnimationFrame(this._scrollRAF)
-    }
-
-    this._scrollRAF = requestAnimationFrame(() => {
-      this._scrollRAF = null
-      this.processScrollEvent()
-    })
-
-    // 重置滚动结束定时器
-    this.resetScrollEndTimer()
-  }
-
-  /**
-   * 计算有效的内容高度（排除末尾空白区域）- 优化版本
-   */
-  getEffectiveContentHeight() {
-    // 1. 使用缓存避免重复计算
-    const now = Date.now()
-    if (this._cachedHeight && this._lastHeightCheck
-      && (now - this._lastHeightCheck) < 1000) { // 1秒缓存
-      return this._cachedHeight
-    }
-
-    // 2. 基础高度检查
-    const scrollHeight = document.documentElement.scrollHeight
-    const clientHeight = document.documentElement.clientHeight
-
-    // 如果内容高度小于等于视口高度，直接返回并缓存
-    if (scrollHeight <= clientHeight) {
-      this._cachedHeight = scrollHeight
-      this._lastHeightCheck = now
-      return scrollHeight
-    }
-
-    // 3. 使用更高效的DOM查询
-    const body = document.body
-    if (!body) {
-      this._cachedHeight = scrollHeight
-      this._lastHeightCheck = now
-      return scrollHeight
-    }
-
-    // 4. 使用querySelectorAll优化元素查找
-    const contentElements = body.querySelectorAll('*')
-    if (contentElements.length === 0) {
-      this._cachedHeight = scrollHeight
-      this._lastHeightCheck = now
-      return scrollHeight
-    }
-
-    // 5. 找到最后一个有实际内容的元素（优化版本）
-    let lastContentElement = null
-    let maxBottom = 0
-
-    // 使用更高效的遍历方式
-    for (let i = contentElements.length - 1; i >= 0; i--) {
-      const element = contentElements[i]
-
-      // 快速跳过不可见元素
-      const rect = element.getBoundingClientRect()
-      if (rect.height <= 0)
-        continue
-
-      const computedStyle = window.getComputedStyle(element)
-      if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden')
-        continue
-
-      // 检查元素是否有实际内容
-      const textContent = element.textContent || ''
-      if (textContent.trim().length > 0) {
-        const elementBottom = rect.bottom + window.scrollY
-        if (elementBottom > maxBottom) {
-          maxBottom = elementBottom
-          lastContentElement = element
-        }
-      }
-    }
-
-    // 6. 计算有效高度
-    let effectiveHeight
-    if (lastContentElement) {
-      const rect = lastContentElement.getBoundingClientRect()
-      effectiveHeight = rect.bottom + window.scrollY
-    }
-    else {
-      effectiveHeight = scrollHeight
-    }
-
-    // 7. 确保有效高度不小于原始高度的90%，避免过度裁剪
-    effectiveHeight = Math.max(effectiveHeight, scrollHeight * 0.9)
-
-    // 8. 缓存结果
-    this._cachedHeight = effectiveHeight
-    this._lastHeightCheck = now
-
-    return effectiveHeight
-  }
-
-  /**
-   * 处理滚动事件 - 优化版本，减少延迟
-   */
-  processScrollEvent() {
-    const clientHeight = document.documentElement.clientHeight
-    const effectiveHeight = this.getEffectiveContentHeight()
-
-    if (effectiveHeight <= clientHeight)
-      return
-
-    const scrollY = window.scrollY
-    const percent = Math.max(0, Math.min(1, scrollY / (effectiveHeight - clientHeight)))
-
-    // 创建滚动事件
-    const event = {
-      percent,
-      timestamp: Date.now(),
-      source: 'preview',
-      direction: this.calculateDirection(percent),
-    }
-
-    // 处理滚动事件
-    this.handleScrollEvent(event)
-  }
-
-  /**
-   * 计算滚动方向
-   */
-  calculateDirection(percent) {
-    if (!this.lastEvent)
-      return 'none'
-
-    const diff = percent - this.lastEvent.percent
-    if (Math.abs(diff) < this.MIN_PERCENT_DIFF)
-      return 'none'
-
-    return diff > 0 ? 'down' : 'up'
-  }
-
-  /**
-   * 处理滚动事件 - 基于状态锁和事件源驱动
-   */
-  handleScrollEvent(event) {
-    // 快速检查是否启用
-    if (!this.isEnabled)
-      return
-
-    // 状态锁检查：如果正在同步且来源不匹配，忽略事件
-    if (this.isSyncing && this.syncSource !== event.source)
-      return
-
-    // 去重检查：避免重复处理相同的事件
-    if (this.lastEvent
-      && event.source === this.lastEvent.source
-      && Math.abs(event.percent - this.lastEvent.percent) < this.MIN_PERCENT_DIFF
-      && (event.timestamp - this.lastEvent.timestamp) < this.DEBOUNCE_MS) {
-      return
-    }
-
-    // 清除之前的防抖定时器
-    if (this.syncTimeout) {
-      clearTimeout(this.syncTimeout)
-    }
-
-    // 智能防抖：根据滚动速度调整延迟
-    const debounceMs = this.calculateSmartDebounce(event.percent)
-
-    // 使用 requestAnimationFrame 优化性能
-    if (debounceMs <= 0) {
-      requestAnimationFrame(() => {
-        this.sendScrollPercent(event.percent)
-      })
-    }
-    else {
-      this.syncTimeout = setTimeout(() => {
-        requestAnimationFrame(() => {
-          this.sendScrollPercent(event.percent)
-        })
-      }, debounceMs)
-    }
-
-    this.lastEvent = event
-  }
-
-  /**
-   * 计算智能防抖时间 - 优化版本
-   */
-  calculateSmartDebounce(percent) {
-    if (!this.lastEvent) {
-      return this.DEBOUNCE_MS
-    }
-
-    const timeDiff = Date.now() - this.lastEvent.timestamp
-    const percentDiff = Math.abs(percent - this.lastEvent.percent)
-
-    // 快速滚动时直接使用 requestAnimationFrame，无延迟
-    if (percentDiff > this.FAST_SCROLL_THRESHOLD && timeDiff < 30) {
-      return 0 // 快速滚动时无延迟
-    }
-
-    // 慢速滚动时使用最小防抖
-    return this.DEBOUNCE_MS
-  }
-
-  /**
-   * 发送滚动百分比
-   */
-  sendScrollPercent(percent) {
-    // 激活状态锁：标记为预览触发的同步
-    this.isSyncing = true
-    this.syncSource = 'preview'
-    this.lastPercent = percent
-
-    // 发送消息给扩展
-    if (window.vscode && window.vscode.postMessage) {
-      window.vscode.postMessage({
-        command: 'previewScrolled',
-        percent,
-      })
-    }
-
-    // 设置状态释放定时器
-    setTimeout(() => {
-      this.isSyncing = false
-      this.syncSource = null
-    }, this.SYNC_BLOCK_MS)
-  }
-
-  /**
-   * 处理来自扩展的消息 - 重构版本
-   */
-  handleMessage(event) {
-    const message = event.data
-
-    if (message.command === 'syncScrollToPercent') {
-      this.syncToPercent(message.percent, message.immediate, message.source)
-    }
-  }
-
-  /**
-   * 同步滚动到指定百分比 - 基于状态锁的实现
-   * @param {number} percent - 滚动百分比 (0-1)
-   * @param {boolean} _immediate - 是否立即滚动（未使用）
-   * @param {string} source - 滚动来源
-   */
-  syncToPercent(percent, _immediate = false, source = 'editor') {
-    // 状态锁检查：如果正在同步且来源不匹配，跳过
-    if (this.isSyncing && this.syncSource !== source) {
-      return
-    }
-
-    const effectiveHeight = this.getEffectiveContentHeight()
-    const clientHeight = document.documentElement.clientHeight
-
-    if (effectiveHeight <= clientHeight) {
-      return
-    }
-
-    // 计算目标滚动位置
-    const targetY = percent * (effectiveHeight - clientHeight)
-    const currentY = window.scrollY
-
-    // 防止微小变化：只在真正需要滚动时才执行
-    if (Math.abs(targetY - currentY) < 2) {
-      return
-    }
-
-    // 激活状态锁：标记为编辑器触发的同步
-    this.isSyncing = true
-    this.syncSource = 'editor'
-
-    // 使用即时滚动，避免动画延迟
-    window.scrollTo({ top: targetY, behavior: 'instant' })
-
-    // 更新最后的百分比记录
-    this.lastPercent = percent
-
-    // 设置状态释放定时器
-    setTimeout(() => {
-      this.isSyncing = false
-      this.syncSource = null
-    }, this.SYNC_BLOCK_MS)
-
-    // 滚动结束检测
-    this.resetScrollEndTimer()
-  }
-
-  /**
-   * 重置滚动结束定时器
-   */
-  resetScrollEndTimer() {
-    if (this.scrollEndTimeout) {
-      clearTimeout(this.scrollEndTimeout)
-    }
-
-    this.scrollEndTimeout = setTimeout(() => {
-      // 滚动结束，释放状态锁
-      this.isSyncing = false
-      this.syncSource = null
-      // 滚动结束后发送一次同步，确保位置准确
-      this.sendScrollPercent()
-    }, this.SCROLL_END_MS)
-  }
-
-  /**
-   * 设置ResizeObserver监听内容高度变化 - 优化版本
-   */
-  setupResizeObserver() {
-    // 监听内容高度变化，应对图片加载等情况
-    this.resizeObserver = new ResizeObserver((_entries) => {
-      // 当内容高度变化时，清除缓存并重新计算
-      this._cachedHeight = null
-      this._lastHeightCheck = null
-
-      // 使用防抖机制避免频繁处理
-      if (this._resizeTimeout) {
-        clearTimeout(this._resizeTimeout)
-      }
-
-      this._resizeTimeout = setTimeout(() => {
-        this._resizeTimeout = null
-        this.sendScrollPercent()
-      }, 100) // 100ms防抖
-    })
-
-    // 观察body元素的变化
-    this.resizeObserver.observe(document.body)
-  }
-
-  /**
-   * 清理资源 - 完善版本
+   * 清理资源
    */
   destroy() {
-    // 1. 清理所有定时器
+    // 断开观察器
+    if (this.observer) {
+      this.observer.disconnect()
+      this.observer = null
+    }
+    
+    // 清除定时器
     if (this.syncTimeout) {
       clearTimeout(this.syncTimeout)
       this.syncTimeout = null
     }
-
-    if (this.scrollEndTimeout) {
-      clearTimeout(this.scrollEndTimeout)
-      this.scrollEndTimeout = null
+    
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout)
+      this.scrollTimeout = null
     }
-
-    if (this._resizeTimeout) {
-      clearTimeout(this._resizeTimeout)
-      this._resizeTimeout = null
-    }
-
-    // 2. 清理requestAnimationFrame
-    if (this._scrollRAF) {
-      cancelAnimationFrame(this._scrollRAF)
-      this._scrollRAF = null
-    }
-
-    // 3. 清理ResizeObserver
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect()
-      this.resizeObserver = null
-    }
-
-    // 4. 清理缓存
-    this._cachedHeight = null
-    this._lastHeightCheck = null
-
-    // 5. 重置状态
+    
+    // 清空映射
+    this.visibleElements.clear()
+    
+    // 重置状态
+    this.isEnabled = false
     this.isSyncing = false
     this.syncSource = null
-    this.lastEvent = null
-    this.isEnabled = false
-
-    console.warn('[ScrollSyncManager] Webview资源清理完成')
+    
+    console.log('[ScrollSync] 资源清理完成')
   }
 }
 
 // 导出给外部使用
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ScrollSyncManager }
-}
-else {
-  window.ScrollSyncManager = ScrollSyncManager
+  module.exports = { IntersectionBasedScrollSync }
+} else {
+  window.ScrollSyncManager = IntersectionBasedScrollSync
 }

@@ -4,7 +4,7 @@ import { container } from '@mdit/plugin-container'
 import { katex } from '@mdit/plugin-katex'
 import matter from 'gray-matter'
 import MarkdownIt from 'markdown-it'
-import { full as markdownItEmoji } from 'markdown-it-emoji'
+import * as markdownItEmoji from 'markdown-it-emoji'
 import markdownItFootnote from 'markdown-it-footnote'
 import lazy_loading from 'markdown-it-image-lazy-loading'
 import markdownItIns from 'markdown-it-ins'
@@ -45,7 +45,7 @@ export class MarkdownRenderer {
 
     // 集成图片懒加载插件
     this._markdownIt.use(lazy_loading)
-    this._markdownIt.use(markdownItEmoji)
+    this._markdownIt.use(markdownItEmoji.full)
     this._markdownIt.use(markdownItFootnote)
     this._markdownIt.use(markdownItIns)
     this._markdownIt.use(markdownItMark)

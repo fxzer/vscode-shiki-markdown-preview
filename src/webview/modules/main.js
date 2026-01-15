@@ -24,6 +24,7 @@ function initializeScrollSync() {
     scrollSyncManager.destroy()
   }
 
+  // 使用新的基于 Intersection Observer 的滚动同步
   scrollSyncManager = new window.ScrollSyncManager()
 }
 
@@ -96,25 +97,16 @@ function handleExtensionMessage(event) {
       }
       break
     }
-    case 'syncScrollToPercent': {
-      // 如果ScrollSyncManager已初始化，使用它处理
+    case 'syncScrollToLine': {
+      // 如果 ScrollSyncManager 已初始化，使用它处理
       if (scrollSyncManager) {
-        scrollSyncManager.syncToPercent(message.percent, message.immediate)
+        scrollSyncManager.scrollToLine(message.line)
       }
       else {
-        // 如果ScrollSyncManager未初始化，直接处理消息 - 优化版本
-        const scrollHeight = document.documentElement.scrollHeight
-        const clientHeight = document.documentElement.clientHeight
-
-        if (scrollHeight > clientHeight) {
-          const targetY = message.percent * (scrollHeight - clientHeight)
-          const currentY = window.scrollY
-
-          // 检查是否需要滚动（避免不必要的滚动操作）
-          if (Math.abs(targetY - currentY) > 2) { // 减少阈值，提高精度
-            // 使用即时滚动，避免动画延迟
-            window.scrollTo({ top: targetY, behavior: 'instant' })
-          }
+        // 如果 ScrollSyncManager 未初始化，直接滚动到行
+        const element = document.querySelector(`[data-line="${message.line}"]`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'instant', block: 'start' })
         }
       }
       break
