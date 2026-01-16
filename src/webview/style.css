@@ -659,10 +659,10 @@ blockquote p:last-child {
   background: rgba(0, 0, 0, 0.25);
 }
 
-pre:hover .copy-button {
+.code-block-wrapper:hover .copy-button {
   display: flex !important;
 }
-pre:hover .lang {
+.code-block-wrapper:hover .lang {
   opacity: 0;
 }
 /* 复制按钮状态样式 */

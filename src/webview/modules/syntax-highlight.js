@@ -12,16 +12,28 @@ function applySyntaxHighlighting() {
       return
     }
 
-    addCopyButton(preElement, codeElement)
-    addLanguageDisplay(preElement, codeElement)
+    // 检查是否已经包裹了 wrapper
+    let wrapper = preElement.parentElement
+    if (!wrapper || !wrapper.classList.contains('code-block-wrapper')) {
+      wrapper = document.createElement('div')
+      wrapper.className = 'code-block-wrapper'
+      wrapper.style.position = 'relative'
+
+      // 插入 wrapper 并移动 preElement
+      preElement.parentNode.insertBefore(wrapper, preElement)
+      wrapper.appendChild(preElement)
+    }
+
+    addCopyButton(wrapper, codeElement)
+    addLanguageDisplay(wrapper, codeElement)
   })
 }
 
 /**
  * 添加复制按钮
  */
-function addCopyButton(preElement, codeElement) {
-  if (preElement.querySelector('.copy-button')) {
+function addCopyButton(wrapper, codeElement) {
+  if (wrapper.querySelector('.copy-button')) {
     return
   }
 
@@ -61,15 +73,15 @@ function addCopyButton(preElement, codeElement) {
     }
   })
 
-  preElement.style.position = 'relative'
-  preElement.appendChild(button)
+  // preElement 不需要 relative，wrapper 已经有了
+  wrapper.appendChild(button)
 }
 
 /**
  * 添加语言显示
  */
-function addLanguageDisplay(preElement, codeElement) {
-  if (preElement.querySelector('.lang')) {
+function addLanguageDisplay(wrapper, codeElement) {
+  if (wrapper.querySelector('.lang')) {
     return
   }
 
@@ -84,7 +96,7 @@ function addLanguageDisplay(preElement, codeElement) {
     const langElement = document.createElement('span')
     langElement.className = 'lang'
     langElement.textContent = language.trim().toLowerCase()
-    preElement.appendChild(langElement)
+    wrapper.appendChild(langElement)
   }
 }
 
