@@ -1,6 +1,39 @@
 * {
   box-sizing: border-box;
 }
+
+/* 自定义滚动条样式 - 让滚动条更低调优雅 */
+/* Webkit 浏览器（Chrome, Safari, Edge）*/
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--vscode-scrollbarSlider-activeBackground, rgba(85, 85, 85, 0.8));
+}
+
+/* Firefox 浏览器 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4)) transparent;
+}
+
 /* 布局相关样式 - 不依赖主题变量 */
 html {
   font-size: var(--font-size, 14px);
@@ -728,17 +761,22 @@ blockquote p:last-child {
   box-shadow: var(--editor-foreground, var(--vscode-foreground)) 0px 0px 3px;
 }
 
-/* 详细菜单样式 */
-.notion-toc-detailed {
+/* 详细菜单包装器样式 - 用于隐藏溢出的滚动条 */
+.notion-toc-detailed-wrapper {
   position: absolute;
   top: 50%;
   right: 0;
   transform: translateY(-50%);
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+/* 详细菜单样式 */
+.notion-toc-detailed {
   background-color: var(--editor-background, var(--vscode-editor-background));
   border: 1px solid var(--markdown-blockQuote-background-level3);
   border-radius: 8px;
   padding: 10px;
-  /* box-shadow: 0 0 6px var(--markdown-blockQuote-background-level1); */
   backdrop-filter: blur(10px);
   min-width: 200px;
   max-width: 240px;

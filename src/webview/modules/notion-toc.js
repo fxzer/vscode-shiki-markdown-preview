@@ -35,14 +35,17 @@ class NotionToc {
       <div class="notion-toc-minimal">
         <div class="toc-lines"></div>
       </div>
-      <div class="notion-toc-detailed" style="display: none;">
-        <div class="toc-items"></div>
+      <div class="notion-toc-detailed-wrapper" style="display: none;">
+        <div class="notion-toc-detailed">
+          <div class="toc-items"></div>
+        </div>
       </div>
     `
 
     document.body.appendChild(this.tocContainer)
 
     this.minimalView = this.tocContainer.querySelector('.notion-toc-minimal')
+    this.detailedViewWrapper = this.tocContainer.querySelector('.notion-toc-detailed-wrapper')
     this.detailedView = this.tocContainer.querySelector('.notion-toc-detailed')
     this.linesContainer = this.tocContainer.querySelector('.toc-lines')
     this.itemsContainer = this.tocContainer.querySelector('.toc-items')
@@ -129,12 +132,12 @@ class NotionToc {
 
   showDetailedView() {
     this.minimalView.style.display = 'none'
-    this.detailedView.style.display = 'block'
+    this.detailedViewWrapper.style.display = 'block'
   }
 
   hideDetailedView() {
     this.minimalView.style.display = 'block'
-    this.detailedView.style.display = 'none'
+    this.detailedViewWrapper.style.display = 'none'
   }
 
   // 优化：独立的滚动到标题函数
