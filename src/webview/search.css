@@ -8,7 +8,7 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 9999;
+  z-index: 1000;
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
@@ -44,6 +44,11 @@
   padding: 6px 10px;
   border: none;
   outline: none;
+}
+
+.search-input:focus {
+  outline: 2px solid var(--textLink-foreground, var(--vscode-textLink-foreground));
+  outline-offset: -1px;
 }
 
 .search-input::placeholder {
@@ -106,8 +111,8 @@
 
 /* 搜索高亮样式 */
 .search-highlight {
-  background-color: #FFE082;
-  color: #000;
+  background-color: var(--vscode-editor-findMatchHighlightBackground, #FFE082);
+  color: var(--vscode-editor-findMatchHighlightForeground, #000);
   padding: 0.1em 0.2em;
   border-radius: 0.1875rem;
   transition: background-color 0.15s ease;
@@ -115,21 +120,21 @@
 
 /* 当前活动高亮样式 */
 .search-highlight.active {
-  background-color: #FFD700;
-  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.4);
+  background-color: var(--vscode-editor-findMatchBackground, #FFD700);
+  color: var(--vscode-editor-findMatchForeground, #000);
+  box-shadow: 0 0 0 2px var(--vscode-editor-findMatchBorder, #E5C100);
 }
 
 /* 暗色主题适配 */
-@media (prefers-color-scheme: dark) {
-  .search-highlight {
-    background-color: rgba(255, 224, 130, 0.5);
-    color: var(--editor-foreground);
-  }
+html[data-markdown-theme-type="dark"] .search-highlight {
+  background-color: rgba(255, 224, 130, 0.5);
+  color: var(--editor-foreground);
+}
 
-  .search-highlight.active {
-    background-color: rgba(255, 215, 0, 0.6);
-    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.3);
-  }
+html[data-markdown-theme-type="dark"] .search-highlight.active {
+  background-color: rgba(255, 215, 0, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.3);
+  color: #000;
 }
 
 /* 响应式设计 - 小屏幕调整 */
