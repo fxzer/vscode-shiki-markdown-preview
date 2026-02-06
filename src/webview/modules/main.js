@@ -26,7 +26,9 @@ function initializeScrollSync() {
   }
 
   // 使用新的基于 Intersection Observer 的滚动同步
-  scrollSyncManager = new window.ScrollSyncManager()
+  if (window.ScrollSyncManager) {
+    scrollSyncManager = new window.ScrollSyncManager()
+  }
 }
 
 /**
