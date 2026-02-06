@@ -24,6 +24,9 @@ class SearchHighlightManager {
     this.searchDebounceTimer = null
     this.SEARCH_DEBOUNCE_MS = 300
 
+    // 中文输入法状态
+    this.isComposing = false
+
     // 全局事件处理器引用
     this.globalKeydownHandler = null
   }
@@ -40,7 +43,6 @@ class SearchHighlightManager {
 
     this.createSearchBox()
     this.bindEvents()
-    console.log('[SearchHighlight] 初始化完成')
   }
 
   /**
@@ -52,18 +54,21 @@ class SearchHighlightManager {
     box.className = 'search-highlight-box'
 
     // SVG 图标定义
-    const prevIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-    const nextIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    // 上箭头：上一个匹配
+    const prevIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10L8 6L12 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    // 下箭头：下一个匹配
+    const nextIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    // 关闭按钮
     const closeIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 
     box.innerHTML = `
       <div class="search-content">
         <input type="text" class="search-input" placeholder="Search..." autocomplete="off" />
         <div class="search-controls">
-          <button class="search-prev" title="Previous match (Shift+Enter)" aria-label="Previous match">
+          <button class="search-prev" title="Previous match (Up arrow)" aria-label="Previous match">
             ${prevIcon}
           </button>
-          <button class="search-next" title="Next match (Enter)" aria-label="Next match">
+          <button class="search-next" title="Next match (Down arrow)" aria-label="Next match">
             ${nextIcon}
           </button>
           <button class="search-close" title="Close (Escape)" aria-label="Close search">
@@ -90,8 +95,30 @@ class SearchHighlightManager {
    * 绑定事件
    */
   bindEvents() {
-    // 输入防抖
+    // 中文输入法开始
+    this.searchInput.addEventListener('compositionstart', () => {
+      this.isComposing = true
+    })
+
+    // 中文输入法结束
+    this.searchInput.addEventListener('compositionend', () => {
+      this.isComposing = false
+      // 清除防抖定时器，防止与 input 事件冲突
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer)
+        this.searchDebounceTimer = null
+      }
+      // 使用 requestAnimationFrame 确保 DOM 更新后再搜索
+      requestAnimationFrame(() => {
+        this.performSearch()
+      })
+    })
+
+    // 输入防抖（仅在非中文输入状态下触发）
     this.searchInput.addEventListener('input', () => {
+      if (this.isComposing) {
+        return // 中文输入过程中不触发搜索
+      }
       if (this.searchDebounceTimer) {
         clearTimeout(this.searchDebounceTimer)
       }
@@ -100,25 +127,18 @@ class SearchHighlightManager {
       }, this.SEARCH_DEBOUNCE_MS)
     })
 
-    // 键盘导航
+    // 键盘导航：上箭头上一个，下箭头/Enter 下一个
     this.searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'ArrowUp') {
         e.preventDefault()
-        if (e.shiftKey) {
-          this.navigateToPrevious()
-        } else {
-          this.navigateToNext()
-        }
-      } else if (e.key === 'Escape') {
-        this.hide()
+        this.navigateToPrevious()
       }
-    })
-
-    // 中文输入法支持：compositionend 事件在用户完成拼音输入后触发
-    this.searchInput.addEventListener('compositionend', () => {
-      const query = this.searchInput.value.trim()
-      if (query) {
-        this.performSearch()
+      else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        e.preventDefault()
+        this.navigateToNext()
+      }
+      else if (e.key === 'Escape') {
+        this.hide()
       }
     })
 
@@ -171,15 +191,13 @@ class SearchHighlightManager {
     // 如果有查询词，恢复搜索状态
     if (this.currentQuery) {
       this.searchInput.value = this.currentQuery
-      // 如果没有搜索结果，需要重新搜索
-      if (this.searchResults.length === 0) {
-        this.performSearch()
-      }
+      // DOM 高亮已被 hide() 清除，需要重新执行搜索
+      this.performSearch()
     }
   }
 
   /**
-   * 隐藏搜索框
+   * 隐藏搜索框（仅隐藏 UI，保留搜索状态）
    */
   hide() {
     if (!this.searchBox) {
@@ -187,7 +205,8 @@ class SearchHighlightManager {
     }
     this.searchBox.classList.remove('visible')
     this.isVisible = false
-    this.clearHighlights()
+    // 清除 DOM 高亮但不清除搜索状态，以便重新打开时恢复
+    this.clearHighlightsDOM()
   }
 
   /**
@@ -196,10 +215,11 @@ class SearchHighlightManager {
   performSearch() {
     const query = this.searchInput.value.trim()
 
-    // 清除之前的高亮
-    this.clearHighlights()
+    // 清除之前的高亮 DOM（不清除状态）
+    this.clearHighlightsDOM()
 
     if (!query) {
+      // 输入为空时，清除所有状态
       this.searchResults = []
       this.currentMatchIndex = -1
       this.currentQuery = ''
@@ -224,13 +244,18 @@ class SearchHighlightManager {
           if (node.parentElement.closest('.search-highlight-box')) {
             return NodeFilter.FILTER_REJECT
           }
+          // 排除 SCRIPT、STYLE 等非内容标签内的文本
+          const excludeTags = ['script', 'style', 'noscript', 'template', 'iframe', 'head']
+          if (node.parentElement.closest(excludeTags.join(','))) {
+            return NodeFilter.FILTER_REJECT
+          }
           // 只接受包含搜索词的文本节点
           if (node.textContent.toLowerCase().includes(query.toLowerCase())) {
             return NodeFilter.FILTER_ACCEPT
           }
           return NodeFilter.FILTER_SKIP
-        }
-      }
+        },
+      },
     )
 
     const textNodes = []
@@ -248,7 +273,8 @@ class SearchHighlightManager {
       this.currentMatchIndex = 0
       this.updateActiveHighlight()
       this.scrollToMatch()
-    } else {
+    }
+    else {
       this.currentMatchIndex = -1
     }
   }
@@ -267,7 +293,7 @@ class SearchHighlightManager {
     const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi')
     let globalIndex = 0
 
-    textNodes.forEach(textNode => {
+    textNodes.forEach((textNode) => {
       const text = textNode.textContent
       const matches = [...text.matchAll(regex)]
 
@@ -296,7 +322,7 @@ class SearchHighlightManager {
         // 保存搜索结果引用
         this.searchResults.push({
           element: highlightSpan,
-          text: match[0]
+          text: match[0],
         })
 
         this.highlightedElements.push(highlightSpan)
@@ -316,24 +342,46 @@ class SearchHighlightManager {
   }
 
   /**
-   * 清除高亮
+   * 清除高亮（仅清除 DOM 高亮，保留搜索状态）
    */
-  clearHighlights() {
+  clearHighlightsDOM() {
     // 移除所有高亮元素的 active 类
-    this.highlightedElements.forEach(el => {
+    this.highlightedElements.forEach((el) => {
       el.classList.remove('active')
     })
 
-    // 恢复原始文本（将 span 替换为文本节点）
-    const highlights = document.querySelectorAll('.search-highlight')
-    highlights.forEach(highlight => {
+    // 查找所有高亮元素
+    const highlights = Array.from(document.querySelectorAll('.search-highlight'))
+
+    // 从后往前替换，避免影响前面的元素
+    for (let i = highlights.length - 1; i >= 0; i--) {
+      const highlight = highlights[i]
+
+      // 跳过搜索框内的高亮
+      if (highlight.closest('.search-highlight-box')) {
+        continue
+      }
+
+      // 跳过没有父节点的元素
+      if (!highlight.parentNode) {
+        continue
+      }
+
       const text = highlight.textContent
       const textNode = document.createTextNode(text)
       highlight.parentNode.replaceChild(textNode, highlight)
-    })
+    }
 
-    // 重置状态
+    // 只清除 DOM 引用，不清除搜索状态
     this.highlightedElements = []
+  }
+
+  /**
+   * 清除高亮（清除 DOM 高亮和所有搜索状态）
+   */
+  clearHighlights() {
+    this.clearHighlightsDOM()
+    // 重置完整状态
     this.searchResults = []
     this.currentMatchIndex = -1
     this.currentQuery = ''
@@ -383,7 +431,7 @@ class SearchHighlightManager {
     // 使用 smooth 滚动行为
     match.element.scrollIntoView({
       behavior: 'smooth',
-      block: 'center'
+      block: 'center',
     })
   }
 
@@ -392,7 +440,7 @@ class SearchHighlightManager {
    */
   updateActiveHighlight() {
     // 移除所有高亮元素的 active 类
-    this.highlightedElements.forEach(el => {
+    this.highlightedElements.forEach((el) => {
       el.classList.remove('active')
     })
 
@@ -449,14 +497,13 @@ class SearchHighlightManager {
     this.closeButton = null
     this.countSpan = null
     this.isVisible = false
-
-    console.log('[SearchHighlight] 销毁完成')
   }
 }
 
 // 导出给外部使用
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { SearchHighlightManager }
-} else {
+}
+else {
   window.SearchHighlightManager = SearchHighlightManager
 }
