@@ -44,6 +44,7 @@ export class HTMLTemplateService {
       'mermaid-renderer.js',
       ...(enableScrollSync ? ['scroll-sync.js'] : []),
       'notion-toc.js',
+      'search-highlight.js',
       'main.js',
     ]
 
@@ -52,6 +53,7 @@ export class HTMLTemplateService {
     )
 
     const webviewCssUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src/webview/style.css'))
+    const searchCssUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src/webview/search.css'))
 
     // 按需加载 KaTeX CSS - 使用本地文件
     const katexCSS = enableKatex
@@ -65,7 +67,8 @@ export class HTMLTemplateService {
                 <meta charset="UTF-8">
                 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: data:; script-src 'nonce-${nonce}'; connect-src https:;">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <link href="${webviewCssUri}" rel="stylesheet">${katexCSS}
+                <link href="${webviewCssUri}" rel="stylesheet">
+<link href="${searchCssUri}" rel="stylesheet">${katexCSS}
                 <style>
                     :root {
                         ${themeCSSVariables}
