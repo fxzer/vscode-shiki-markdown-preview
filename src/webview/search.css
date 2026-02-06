@@ -6,13 +6,15 @@
 /* 搜索框容器 */
 .search-highlight-box {
   position: fixed;
-  bottom: 20px;
+  top: 20px;
   right: 20px;
   z-index: 1000;
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(-10px);
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 /* 搜索框可见状态 */
@@ -25,54 +27,61 @@
 /* 内容区域 */
 .search-content {
   background-color: var(--editor-background, var(--vscode-editor-background));
-  border: 1px solid var(--markdown-blockQuote-border, var(--vscode-widget-border));
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 1px solid
+    var(--markdown-blockQuote-border, var(--vscode-widget-border));
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
-  padding: 4px;
-  gap: 4px;
+  padding: 2px;
+  gap: 2px;
 }
 
 /* 搜索输入框 */
 .search-input {
   background: transparent;
   color: var(--editor-foreground, var(--vscode-foreground));
-  font-size: 14px;
+  font-size: 13px;
   font-family: var(--font-family, var(--vscode-editor-font-family));
-  width: 200px;
-  padding: 6px 10px;
+  width: 140px;
+  padding: 4px 8px;
   border: none;
   outline: none;
 }
 
 .search-input:focus {
-  outline: 2px solid var(--textLink-foreground, var(--vscode-textLink-foreground));
-  outline-offset: -1px;
+  outline: 2px solid
+    var(--textLink-foreground, var(--vscode-textLink-foreground));
+  outline-offset: 2px;
+  border-radius: 4px 0 0 4px;
 }
 
 .search-input::placeholder {
-  color: var(--markdown-darkened-foreground, var(--vscode-input-placeholderForeground));
+  color: var(
+    --markdown-darkened-foreground,
+    var(--vscode-input-placeholderForeground)
+  );
   opacity: 0.7;
 }
 
 /* 按钮区域 */
 .search-controls {
   display: flex;
-  gap: 2px;
-  border-left: 1px solid var(--markdown-blockQuote-border, var(--vscode-widget-border));
-  padding-left: 4px;
+  gap: 1px;
+  border-left: 1px solid
+    var(--markdown-blockQuote-border, var(--vscode-widget-border));
+  padding-left: 3px;
 }
 
 /* 搜索按钮样式 */
 .search-prev,
 .search-next,
 .search-close {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
   cursor: pointer;
   color: var(--editor-foreground, var(--vscode-foreground));
   display: flex;
@@ -82,56 +91,72 @@
   transition: background-color 0.15s ease;
 }
 
+/* 调整 SVG 图标尺寸 */
+.search-prev svg,
+.search-next svg,
+.search-close svg {
+  width: 12px;
+  height: 12px;
+}
+
 .search-prev:hover,
 .search-next:hover,
 .search-close:hover {
-  background-color: var(--markdown-blockQuote-background-level1, var(--vscode-toolbar-hoverBackground));
+  background-color: var(
+    --markdown-blockQuote-background-level1,
+    var(--vscode-toolbar-hoverBackground)
+  );
 }
 
 .search-prev:active,
 .search-next:active,
 .search-close:active {
-  background-color: var(--markdown-blockQuote-background-level2, var(--vscode-toolbar-activeBackground));
+  background-color: var(
+    --markdown-blockQuote-background-level2,
+    var(--vscode-toolbar-activeBackground)
+  );
 }
 
 /* 搜索计数显示 */
 .search-count {
   position: absolute;
-  top: -12px;
+  top: -10px;
   right: 4px;
-  background-color: var(--textLink-foreground, var(--vscode-textLink-foreground));
+  background-color: var(
+    --textLink-foreground,
+    var(--vscode-textLink-foreground)
+  );
   color: var(--editor-background, var(--vscode-editor-background));
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 8px;
-  min-width: 32px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  min-width: 26px;
   text-align: center;
 }
 
 /* 搜索高亮样式 */
 .search-highlight {
-  background-color: var(--vscode-editor-findMatchHighlightBackground, #FFE082);
+  background-color: var(--vscode-editor-findMatchHighlightBackground, #ffe082);
   color: var(--vscode-editor-findMatchHighlightForeground, #000);
-  padding: 0.1em 0.2em;
-  border-radius: 0.1875rem;
+  border-radius: 0.1rem;
   transition: background-color 0.15s ease;
 }
 
 /* 当前活动高亮样式 */
 .search-highlight.active {
-  background-color: var(--vscode-editor-findMatchBackground, #FFD700);
+  background-color: var(--vscode-editor-findMatchBackground, #ffd700);
   color: var(--vscode-editor-findMatchForeground, #000);
-  box-shadow: 0 0 0 2px var(--vscode-editor-findMatchBorder, #E5C100);
+  box-shadow: 0 0 0 2px var(--vscode-editor-findMatchBorder, #e5c100);
 }
 
 /* 暗色主题适配 */
-html[data-markdown-theme-type="dark"] .search-highlight {
+html[data-markdown-theme-type='dark'] .search-highlight {
   background-color: rgba(255, 224, 130, 0.5);
   color: var(--editor-foreground);
 }
 
-html[data-markdown-theme-type="dark"] .search-highlight.active {
+html[data-markdown-theme-type='dark'] .search-highlight.active {
   background-color: rgba(255, 215, 0, 0.6);
   box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.3);
   color: #000;
@@ -140,48 +165,63 @@ html[data-markdown-theme-type="dark"] .search-highlight.active {
 /* 响应式设计 - 小屏幕调整 */
 @media (max-width: 768px) {
   .search-highlight-box {
-    bottom: 10px;
+    top: 10px;
     right: 10px;
   }
 
   .search-input {
-    width: 150px;
-    font-size: 13px;
+    width: 120px;
+    font-size: 12px;
   }
 
   .search-prev,
   .search-next,
   .search-close {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
   }
 
   .search-count {
-    font-size: 9px;
-    padding: 1px 4px;
-    min-width: 28px;
+    font-size: 8px;
+    padding: 1px 3px;
+    min-width: 22px;
   }
 }
 
 /* 超小屏幕适配 */
 @media (max-width: 480px) {
   .search-highlight-box {
-    bottom: 5px;
-    right: 5px;
+    top: 8px;
+    right: 8px;
   }
 
   .search-input {
-    width: 120px;
-    padding: 4px 8px;
+    width: 100px;
+    padding: 3px 6px;
+    font-size: 11px;
   }
 
   .search-content {
-    padding: 3px;
-    gap: 2px;
+    padding: 2px;
+    gap: 1px;
   }
 
   .search-controls {
     gap: 1px;
-    padding-left: 3px;
+    padding-left: 2px;
+  }
+
+  .search-prev,
+  .search-next,
+  .search-close {
+    width: 18px;
+    height: 18px;
+  }
+
+  .search-prev svg,
+  .search-next svg,
+  .search-close svg {
+    width: 10px;
+    height: 10px;
   }
 }

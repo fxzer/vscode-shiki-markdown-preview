@@ -140,7 +140,7 @@ export class ScrollSyncManager {
    */
   private async syncToEditor(line: number): Promise<void> {
     const startTime = Date.now()
-    
+
     // 如果是编辑器触发的同步，忽略
     if (this._isSyncing && this._syncSource === 'editor') {
       console.log('[ScrollSyncManager] 忽略：编辑器触发的同步')
@@ -177,7 +177,7 @@ export class ScrollSyncManager {
 
       // 更新当前行号
       this._currentLine = targetLine
-      
+
       console.log(`[ScrollSyncManager] 滚动到行 ${targetLine}，总耗时: ${Date.now() - startTime}ms`)
     }
     catch (error) {

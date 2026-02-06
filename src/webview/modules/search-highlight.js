@@ -230,39 +230,8 @@ class SearchHighlightManager {
     this.currentQuery = query
     this.searchResults = []
 
-    // 使用 TreeWalker 遍历文本节点
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: (node) => {
-          // 排除代码块内的文本
-          if (node.parentElement.closest('pre')) {
-            return NodeFilter.FILTER_REJECT
-          }
-          // 排除搜索框内的文本
-          if (node.parentElement.closest('.search-highlight-box')) {
-            return NodeFilter.FILTER_REJECT
-          }
-          // 排除 SCRIPT、STYLE 等非内容标签内的文本
-          const excludeTags = ['script', 'style', 'noscript', 'template', 'iframe', 'head']
-          if (node.parentElement.closest(excludeTags.join(','))) {
-            return NodeFilter.FILTER_REJECT
-          }
-          // 只接受包含搜索词的文本节点
-          if (node.textContent.toLowerCase().includes(query.toLowerCase())) {
-            return NodeFilter.FILTER_ACCEPT
-          }
-          return NodeFilter.FILTER_SKIP
-        },
-      },
-    )
-
-    const textNodes = []
-    let node
-    while ((node = walker.nextNode())) {
-      textNodes.push(node)
-    }
+    // 使用递归方式遍历文本节点，避免 TreeWalker 的 DOM 状态问题
+    const textNodes = this.collectTextNodes(document.body, query)
 
     // 高亮匹配项
     this.highlightMatches(textNodes, query)
@@ -277,6 +246,36 @@ class SearchHighlightManager {
     else {
       this.currentMatchIndex = -1
     }
+  }
+
+  /**
+   * 递归收集包含搜索词的文本节点
+   * 使用递归而不是 TreeWalker，避免 DOM 状态不一致的问题
+   */
+  collectTextNodes(element, query) {
+    const textNodes = []
+    const excludeTags = ['script', 'style', 'noscript', 'template', 'iframe', 'head', 'pre']
+
+    for (const child of element.childNodes) {
+      // 跳过排除的标签
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const tagName = child.tagName.toLowerCase()
+        if (excludeTags.includes(tagName) || child.classList.contains('search-highlight-box')) {
+          continue
+        }
+        // 递归遍历子元素
+        textNodes.push(...this.collectTextNodes(child, query))
+      }
+      // 收集包含搜索词的文本节点
+      else if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent.trim()
+        if (text && text.toLowerCase().includes(query.toLowerCase())) {
+          textNodes.push(child)
+        }
+      }
+    }
+
+    return textNodes
   }
 
   /**
@@ -371,6 +370,9 @@ class SearchHighlightManager {
       const textNode = document.createTextNode(text)
       highlight.parentNode.replaceChild(textNode, highlight)
     }
+
+    // 合并相邻的文本节点，确保 DOM 结构一致
+    document.normalize()
 
     // 只清除 DOM 引用，不清除搜索状态
     this.highlightedElements = []
