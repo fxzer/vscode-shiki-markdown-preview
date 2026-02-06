@@ -2,6 +2,7 @@
 
 // 初始化滚动同步管理器
 let scrollSyncManager = null
+let searchHighlightManager = null
 
 /**
  * 初始化滚动同步
@@ -26,6 +27,20 @@ function initializeScrollSync() {
 
   // 使用新的基于 Intersection Observer 的滚动同步
   scrollSyncManager = new window.ScrollSyncManager()
+}
+
+/**
+ * 初始化搜索高亮
+ */
+function initializeSearchHighlight() {
+  if (searchHighlightManager) {
+    return
+  }
+
+  if (window.SearchHighlightManager) {
+    searchHighlightManager = new window.SearchHighlightManager()
+    searchHighlightManager.initialize()
+  }
 }
 
 /**
@@ -200,6 +215,9 @@ function initializeWebviewModules() {
 
   // 初始化滚动同步
   initializeScrollSync()
+
+  // 初始化搜索高亮
+  initializeSearchHighlight()
 }
 
 // 页面加载完成后也调用一次，确保语法高亮被应用
@@ -225,10 +243,12 @@ if (typeof module !== 'undefined' && module.exports) {
     initializeScrollSync,
     handleExtensionMessage,
     scrollSyncManager: () => scrollSyncManager,
+    searchHighlightManager: () => searchHighlightManager,
   }
 }
 else {
   window.initializeWebviewModules = initializeWebviewModules
   window.initializeScrollSync = initializeScrollSync
   window.handleExtensionMessage = handleExtensionMessage
+  window.searchHighlightManager = () => searchHighlightManager
 }
