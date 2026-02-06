@@ -165,6 +165,14 @@ export class MarkdownPreviewPanel {
   }
 
   /**
+   * 获取目录展开设置
+   */
+  private getTocExpandSetting(): boolean {
+    const config = vscode.workspace.getConfiguration('shikiMarkdownPreview')
+    return config.get<boolean>('expandTocByDefault', false)
+  }
+
+  /**
    * Set up panel configuration
    */
   private setupPanel(): void {
@@ -480,6 +488,7 @@ export class MarkdownPreviewPanel {
       fontFamily, // 传递字体设置
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
       enableKatex, // 传递 KaTeX 启用状态
+      expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     })
 
     // 更新面板标题 - 优先使用 front matter 中的 title
@@ -543,6 +552,7 @@ export class MarkdownPreviewPanel {
       markdownThemeType: this._themeService.getCurrentThemeType(), // 传递主题类型
       documentWidth, // 传递文档宽度
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
+      expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     })
   }
 
@@ -566,6 +576,7 @@ export class MarkdownPreviewPanel {
       markdownThemeType: this._themeService.getCurrentThemeType(), // 传递主题类型
       documentWidth, // 传递文档宽度
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
+      expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     })
   }
 

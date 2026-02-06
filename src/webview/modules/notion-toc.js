@@ -12,6 +12,9 @@ class NotionToc {
     this.observer = null
     this.isManualScrolling = false // 标志位：是否正在手动滚动
 
+    // 读取目录展开配置
+    this.expandByDefault = window.tocConfig?.expandTocByDefault || false
+
     this.init()
   }
 
@@ -21,6 +24,11 @@ class NotionToc {
       this.refresh() // 使用 refresh 作为统一的解析和渲染入口
       this.bindEvents()
       this.observeContentChanges()
+
+      // 根据配置设置初始展开状态
+      if (this.expandByDefault) {
+        this.showDetailedView()
+      }
     }
     catch (error) {
       console.error('Error in NotionToc init():', error)
@@ -117,8 +125,11 @@ class NotionToc {
   }
 
   bindEvents() {
-    this.tocContainer.addEventListener('mouseenter', () => this.showDetailedView())
-    this.tocContainer.addEventListener('mouseleave', () => this.hideDetailedView())
+    // 只有在不是默认展开时，才监听鼠标悬停事件
+    if (!this.expandByDefault) {
+      this.tocContainer.addEventListener('mouseenter', () => this.showDetailedView())
+      this.tocContainer.addEventListener('mouseleave', () => this.hideDetailedView())
+    }
 
     // 详细视图的a标签会处理跳转，但为了平滑滚动，我们也需要处理
     this.itemsContainer.addEventListener('click', (e) => {

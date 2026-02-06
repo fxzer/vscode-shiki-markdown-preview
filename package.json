@@ -2,7 +2,7 @@
   "publisher": "fxzer8888",
   "name": "shiki-markdown-preview",
   "displayName": "Shiki Markdown Preview",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "private": true,
   "description": "一个功能强大的 VS Code 扩展，提供基于 Shiki 的 Markdown 预览功能，支持 60+ 种语法高亮主题。",
   "license": "MIT",
@@ -183,6 +183,11 @@
           "type": "boolean",
           "default": true,
           "description": "启用预览区与编辑区的同步滚动功能。当启用时，滚动编辑器或预览区时，另一个区域会自动同步滚动到对应位置。"
+        },
+        "shikiMarkdownPreview.expandTocByDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否默认展开目录详情。当启用时，目录默认显示完整内容；当关闭时，目录默认显示缩略短线，鼠标悬停时展开。"
         }
       }
     }

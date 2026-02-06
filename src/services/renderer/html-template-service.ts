@@ -14,6 +14,7 @@ export interface HTMLTemplateOptions {
   fontFamily?: string
   enableScrollSync?: boolean
   enableKatex?: boolean
+  expandTocByDefault?: boolean
 }
 
 export class HTMLTemplateService {
@@ -33,6 +34,7 @@ export class HTMLTemplateService {
       fontFamily = 'inherit',
       enableScrollSync = true,
       enableKatex = false,
+      expandTocByDefault = false,
     } = options
 
     // 模块化脚本加载 - 根据设置条件性加载滚动同步脚本
@@ -89,7 +91,12 @@ export class HTMLTemplateService {
                 <script nonce="${nonce}">
                     // 将 front matter 数据存储到全局变量中
                     window.frontMatterData = ${JSON.stringify(frontMatterData)};
-                    
+
+                    // 存储目录配置
+                    window.tocConfig = {
+                        expandTocByDefault: ${expandTocByDefault ? 'true' : 'false'}
+                    };
+
                     // 初始化 VS Code API
                     let vscode;
                     if (window.vscode) {
