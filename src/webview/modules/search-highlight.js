@@ -23,6 +23,9 @@ class SearchHighlightManager {
     // 防抖定时器
     this.searchDebounceTimer = null
     this.SEARCH_DEBOUNCE_MS = 300
+
+    // 全局事件处理器引用
+    this.globalKeydownHandler = null
   }
 
   /**
@@ -117,7 +120,7 @@ class SearchHighlightManager {
     this.closeButton.addEventListener('click', () => this.hide())
 
     // 全局快捷键
-    document.addEventListener('keydown', (e) => {
+    this.globalKeydownHandler = (e) => {
       // Command+F (Mac) 或 Ctrl+F (Windows/Linux)
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
@@ -130,7 +133,8 @@ class SearchHighlightManager {
           this.performSearch()
         }
       }
-    })
+    }
+    document.addEventListener('keydown', this.globalKeydownHandler)
   }
 
   /**
@@ -395,6 +399,12 @@ class SearchHighlightManager {
     if (this.searchDebounceTimer) {
       clearTimeout(this.searchDebounceTimer)
       this.searchDebounceTimer = null
+    }
+
+    // 移除全局事件监听器
+    if (this.globalKeydownHandler) {
+      document.removeEventListener('keydown', this.globalKeydownHandler)
+      this.globalKeydownHandler = null
     }
 
     // 清除高亮
