@@ -114,6 +114,14 @@ class SearchHighlightManager {
       }
     })
 
+    // 中文输入法支持：compositionend 事件在用户完成拼音输入后触发
+    this.searchInput.addEventListener('compositionend', () => {
+      const query = this.searchInput.value.trim()
+      if (query) {
+        this.performSearch()
+      }
+    })
+
     // 导航按钮
     this.prevButton.addEventListener('click', () => this.navigateToPrevious())
     this.nextButton.addEventListener('click', () => this.navigateToNext())
@@ -141,14 +149,32 @@ class SearchHighlightManager {
    * 显示搜索框
    */
   show() {
-    if (!this.searchBox) {
-      return
+    // 先检查 DOM 中是否已存在搜索框元素（防止状态丢失）
+    const existingBox = document.getElementById('search-highlight-box')
+    if (existingBox) {
+      // 使用已存在的元素，重新获取引用
+      this.searchBox = existingBox
+      this.searchInput = existingBox.querySelector('.search-input')
+      this.prevButton = existingBox.querySelector('.search-prev')
+      this.nextButton = existingBox.querySelector('.search-next')
+      this.closeButton = existingBox.querySelector('.search-close')
+      this.countSpan = existingBox.querySelector('.search-count')
     }
+
+    if (!this.searchBox) {
+      this.createSearchBox()
+    }
+
     this.searchBox.classList.add('visible')
     this.isVisible = true
-    // 如果有查询词，聚焦后不重新搜索；否则聚焦即可
+
+    // 如果有查询词，恢复搜索状态
     if (this.currentQuery) {
       this.searchInput.value = this.currentQuery
+      // 如果没有搜索结果，需要重新搜索
+      if (this.searchResults.length === 0) {
+        this.performSearch()
+      }
     }
   }
 
