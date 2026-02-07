@@ -41,14 +41,17 @@ class IntersectionBasedScrollSync {
 
     // 等待 DOM 加载完成后观察元素
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.observeElements())
+      document.addEventListener('DOMContentLoaded', () =>
+        this.observeElements())
     }
     else {
       this.observeElements()
     }
 
     // 监听用户滚动 - 使用 passive 提升性能
-    window.addEventListener('scroll', this.handleScroll.bind(this), { passive: true })
+    window.addEventListener('scroll', this.handleScroll.bind(this), {
+      passive: true,
+    })
 
     // 监听来自扩展的消息
     window.addEventListener('message', this.handleMessage.bind(this))
@@ -65,7 +68,6 @@ class IntersectionBasedScrollSync {
     }
 
     elements.forEach(el => this.observer.observe(el))
-    console.log(`[ScrollSync] 开始观察 ${elements.length} 个元素`)
   }
 
   /**
@@ -128,7 +130,6 @@ class IntersectionBasedScrollSync {
 
     if (topLine !== null && topLine !== this.currentTopLine) {
       this.currentTopLine = topLine
-      console.log(`[ScrollSync] 预览滚动到行 ${topLine}`)
       this.sendScrollMessage(topLine)
     }
   }
@@ -163,14 +164,11 @@ class IntersectionBasedScrollSync {
     this.isSyncing = true
     this.syncSource = 'preview'
 
-    const startTime = performance.now()
-
     if (window.vscode && window.vscode.postMessage) {
       window.vscode.postMessage({
         command: 'previewScrolledToLine',
         line,
       })
-      console.log(`[ScrollSync] 发送消息耗时: ${(performance.now() - startTime).toFixed(2)}ms`)
     }
     else {
       console.error('[ScrollSync] vscode API 不可用')
@@ -271,7 +269,6 @@ class IntersectionBasedScrollSync {
    */
   enable() {
     this.isEnabled = true
-    console.log('[ScrollSync] 已启用')
   }
 
   /**
@@ -291,8 +288,6 @@ class IntersectionBasedScrollSync {
       clearTimeout(this.scrollTimeout)
       this.scrollTimeout = null
     }
-
-    console.log('[ScrollSync] 已禁用')
   }
 
   /**
@@ -323,8 +318,6 @@ class IntersectionBasedScrollSync {
     this.isEnabled = false
     this.isSyncing = false
     this.syncSource = null
-
-    console.log('[ScrollSync] 资源清理完成')
   }
 }
 

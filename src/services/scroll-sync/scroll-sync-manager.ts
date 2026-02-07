@@ -101,11 +101,8 @@ export class ScrollSyncManager {
   private setupMessageListener(): void {
     this._disposables.push(
       this._panel.panel.webview.onDidReceiveMessage((message) => {
-        const startTime = Date.now()
         if (message.command === 'previewScrolledToLine') {
-          console.log(`[ScrollSyncManager] 收到滚动消息，行号: ${message.line}`)
           this.syncToEditor(message.line)
-          console.log(`[ScrollSyncManager] 处理耗时: ${Date.now() - startTime}ms`)
         }
       }),
     )
@@ -139,11 +136,8 @@ export class ScrollSyncManager {
    * 根据 webview 发来的行号直接定位
    */
   private async syncToEditor(line: number): Promise<void> {
-    const startTime = Date.now()
-
     // 如果是编辑器触发的同步，忽略
     if (this._isSyncing && this._syncSource === 'editor') {
-      console.log('[ScrollSyncManager] 忽略：编辑器触发的同步')
       return
     }
 
@@ -177,8 +171,6 @@ export class ScrollSyncManager {
 
       // 更新当前行号
       this._currentLine = targetLine
-
-      console.log(`[ScrollSyncManager] 滚动到行 ${targetLine}，总耗时: ${Date.now() - startTime}ms`)
     }
     catch (error) {
       console.error('[ScrollSyncManager] 滚动失败:', error)

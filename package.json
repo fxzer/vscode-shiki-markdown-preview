@@ -199,7 +199,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "watch": "tsc -w -p ./",
-    "ext:package": "vsce package"
+    "ext:package": "vsce package",
+    "publish": "node scripts/publish.js"
   },
   "dependencies": {
     "@mdit/plugin-container": "^0.22.1",

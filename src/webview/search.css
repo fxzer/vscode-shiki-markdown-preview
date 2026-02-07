@@ -27,8 +27,7 @@
 /* 内容区域 */
 .search-content {
   background-color: var(--editor-background, var(--vscode-editor-background));
-  border: 1px solid
-    var(--markdown-blockQuote-border, var(--vscode-widget-border));
+  border: 1px solid var(--markdown-blockQuote-border, var(--vscode-widget-border));
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   display: flex;
@@ -50,17 +49,13 @@
 }
 
 .search-input:focus {
-  outline: 2px solid
-    var(--textLink-foreground, var(--vscode-textLink-foreground));
+  outline: 2px solid var(--textLink-foreground, var(--vscode-textLink-foreground));
   outline-offset: 2px;
   border-radius: 4px 0 0 4px;
 }
 
 .search-input::placeholder {
-  color: var(
-    --markdown-darkened-foreground,
-    var(--vscode-input-placeholderForeground)
-  );
+  color: var(--markdown-darkened-foreground, var(--vscode-input-placeholderForeground));
   opacity: 0.7;
 }
 
@@ -68,8 +63,7 @@
 .search-controls {
   display: flex;
   gap: 1px;
-  border-left: 1px solid
-    var(--markdown-blockQuote-border, var(--vscode-widget-border));
+  border-left: 1px solid var(--markdown-blockQuote-border, var(--vscode-widget-border));
   padding-left: 3px;
 }
 
@@ -102,19 +96,13 @@
 .search-prev:hover,
 .search-next:hover,
 .search-close:hover {
-  background-color: var(
-    --markdown-blockQuote-background-level1,
-    var(--vscode-toolbar-hoverBackground)
-  );
+  background-color: var(--markdown-blockQuote-background-level1, var(--vscode-toolbar-hoverBackground));
 }
 
 .search-prev:active,
 .search-next:active,
 .search-close:active {
-  background-color: var(
-    --markdown-blockQuote-background-level2,
-    var(--vscode-toolbar-activeBackground)
-  );
+  background-color: var(--markdown-blockQuote-background-level2, var(--vscode-toolbar-activeBackground));
 }
 
 /* 搜索计数显示 */
@@ -122,10 +110,7 @@
   position: absolute;
   top: -10px;
   right: 4px;
-  background-color: var(
-    --textLink-foreground,
-    var(--vscode-textLink-foreground)
-  );
+  background-color: var(--textLink-foreground, var(--vscode-textLink-foreground));
   color: var(--editor-background, var(--vscode-editor-background));
   font-size: 9px;
   font-weight: 600;

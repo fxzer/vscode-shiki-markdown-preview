@@ -73,6 +73,9 @@ web_modules/
 .env.production.local
 .env.local
 
+# Release notes (auto-generated)
+.release-notes.md
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

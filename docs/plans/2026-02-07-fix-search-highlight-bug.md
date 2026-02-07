@@ -13,6 +13,7 @@
 ## Background
 
 **Problem Summary:**
+
 1. Initial search "co" works correctly: finds 24 matches and highlights them
 2. Continuing to type "de" to make "code" fails: finds 0 text nodes, all highlights disappear
 
@@ -20,6 +21,7 @@
 The TreeWalker in `performSearch()` does not exclude `<SCRIPT>` tags. When the page contains inline scripts with text like "code" or "co", the TreeWalker traverses these script text nodes, and `highlightMatches()` creates highlight spans inside `<SCRIPT>` elements. This corrupts the script content and breaks subsequent searches.
 
 **Key Evidence from logs:**
+
 ```
 search-highlight.js:393 [SearchHighlight] Replacing highlight 23 text: co parent: SCRIPT
 ```
@@ -34,6 +36,7 @@ Add `closest()` checks to exclude non-content tags in the TreeWalker's `acceptNo
 ## Task 1: Fix TreeWalker Filter to Exclude SCRIPT Tags
 
 **Files:**
+
 - Modify: `src/webview/modules/search-highlight.js` (performSearch function, around line 231-250)
 
 **Step 1: Read the current performSearch function**
@@ -94,6 +97,7 @@ pause caused all highlights to disappear."
 ## Task 2: Manual Testing
 
 **Files:**
+
 - Test: Manual testing in VSCode WebView
 
 **Step 1: Start VSCode Extension Debug**
@@ -148,6 +152,7 @@ Update `bugs.md` with test results:
 ## Task 3: Remove Debug Code (if any remaining)
 
 **Files:**
+
 - Modify: `src/webview/modules/search-highlight.js`
 
 **Step 1: Search for remaining debug statements**
@@ -174,6 +179,7 @@ git commit -m "chore: remove debug logging from search highlight"
 ## Task 4: Update Documentation
 
 **Files:**
+
 - Modify: `bugs.md`
 
 **Step 1: Update bugs.md with resolution**
