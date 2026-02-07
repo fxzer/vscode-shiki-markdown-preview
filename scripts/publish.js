@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import process from 'node:process'
 
 // 获取 package.json 中的版本号
@@ -10,19 +10,12 @@ const version = packageJson.version
 const extensionName = packageJson.name
 const vsixFileName = `${extensionName}-${version}.vsix`
 
+// 简单的 release note
+const notes = `${extensionName} v${version}\n\n查看 [CHANGELOG](./CHANGELOG.md) 了解详细变更。`
+
 console.log(`\n🚀 开始发布 ${extensionName} v${version}\n`)
 
 try {
-  // 0. 生成 Release 文案
-  console.log('📝 0. 生成 Release 文案...')
-  execSync('node scripts/generate-release-notes.js', { stdio: 'inherit' })
-  console.log('✅ 文案生成完成\n')
-
-  // 读取生成的文案
-  const notes = existsSync('./.release-notes.md')
-    ? readFileSync('./.release-notes.md', 'utf-8')
-    : `${extensionName} v${version}`
-
   // 1. 编译
   console.log('📦 1. 编译项目...')
   execSync('npm run compile && npm run copy-assets', { stdio: 'inherit' })
@@ -33,11 +26,16 @@ try {
   execSync('npm run ext:package', { stdio: 'inherit' })
   console.log('✅ 打包完成\n')
 
-  // 3. 创建 GitHub Release 并上传
+  // 3. 推送 tag 到远程
+  console.log('📤 3. 推送 tag 到远程...')
+  execSync(`git push origin v${version}`, { stdio: 'inherit' })
+  console.log('✅ tag 推送完成\n')
+
+  // 4. 创建 GitHub Release 并上传
   console.log('📤 3. 创建 GitHub Release...')
   const releaseUrl = execSync(
-    `gh release create v${version} ./${vsixFileName} --title "Release v${version}" --notes-file -`,
-    { input: notes, stdio: 'pipe', encoding: 'utf-8' },
+    `gh release create v${version} ./${vsixFileName} --title "Release v${version}" --notes "${notes}"`,
+    { stdio: 'pipe', encoding: 'utf-8' },
   ).trim()
 
   console.log('✅ Release 创建成功\n')
