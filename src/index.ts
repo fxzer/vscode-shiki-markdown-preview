@@ -3,12 +3,29 @@ import { ConfigService, MarkdownPreviewPanel, MarkdownPreviewSerializer, showThe
 import { DocumentValidator, ErrorHandler } from './utils'
 
 export function activate(context: vscode.ExtensionContext) {
+  console.log('Shiki Markdown Preview is activating...')
+
   const configService = new ConfigService()
 
-  // 注册配置变更监听器，用于实时主题更新
+  // 首次安装时显示 Cursor 图标配置提示
+  const iconVisibilityHintShown = context.globalState.get<boolean>('iconVisibilityHintShown', false)
+  if (!iconVisibilityHintShown) {
+    // 延迟显示，避免干扰启动体验
+    setTimeout(() => {
+      vscode.window.showInformationMessage(
+        'Shiki Markdown Preview 已安装！如果在编辑器标题栏没有看到预览图标（在 Cursor 中可能需要额外配置），请点击编辑器标题栏右上角的三个点菜单 (...) → Configure Icon Visibility → 勾选 "Shiki Markdown Preview" 图标选项。',
+        '知道了',
+      ).then(() => {
+        context.globalState.update('iconVisibilityHintShown', true)
+      })
+    }, 2000)
+  }
+
+  console.log('Shiki Markdown Preview commands registered successfully!')
   // 注册 markdown 预览命令 - 侧边预览 (ViewColumn.Two)
   context.subscriptions.push(
     vscode.commands.registerCommand('shikiMarkdownPreview.openPreviewSlide', () => {
+      console.log('Command executed: shikiMarkdownPreview.openPreviewSlide')
       const markdownDocument = DocumentValidator.validateMarkdownDocument()
       if (markdownDocument) {
         MarkdownPreviewPanel.createOrShowSlide(context.extensionUri, markdownDocument)

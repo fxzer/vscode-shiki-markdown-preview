@@ -2,7 +2,7 @@
   "publisher": "fxzer8888",
   "name": "shiki-markdown-preview",
   "displayName": "Shiki Markdown Preview",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "private": true,
   "description": "一个功能强大的 VS Code 扩展，提供基于 Shiki 的 Markdown 预览功能，支持 60+ 种语法高亮主题。",
   "license": "MIT",
@@ -51,7 +51,7 @@
     "menus": {
       "editor/title": [
         {
-          "when": "resourceExtname == .md",
+          "when": "resourceLangId == markdown",
           "command": "shikiMarkdownPreview.openPreviewSlide",
           "group": "navigation",
           "alt": "shikiMarkdownPreview.openPreviewFull"
@@ -59,19 +59,19 @@
       ],
       "editor/context": [
         {
-          "when": "resourceExtname == .md",
+          "when": "resourceLangId == markdown",
           "command": "shikiMarkdownPreview.openPreviewSlide",
           "group": "markdown"
         },
         {
-          "when": "resourceExtname == .md",
+          "when": "resourceLangId == markdown",
           "command": "shikiMarkdownPreview.openPreviewFull",
           "group": "markdown"
         }
       ],
       "explorer/context": [
         {
-          "when": "resourceExtname == .md",
+          "when": "resourceLangId == markdown",
           "command": "shikiMarkdownPreview.openPreviewSlide",
           "group": "navigation"
         }
@@ -82,19 +82,19 @@
         "command": "shikiMarkdownPreview.openPreviewSlide",
         "key": "ctrl+shift+v",
         "mac": "cmd+shift+v",
-        "when": "editorTextFocus && resourceExtname == .md"
+        "when": "editorTextFocus && resourceLangId == markdown"
       },
       {
         "command": "shikiMarkdownPreview.openPreviewFull",
         "key": "ctrl+k v",
         "mac": "cmd+k v",
-        "when": "editorTextFocus && resourceExtname == .md"
+        "when": "editorTextFocus && resourceLangId == markdown"
       },
       {
         "command": "shikiMarkdownPreview.selectTheme",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t",
-        "when": "resourceExtname == .md"
+        "when": "resourceLangId == markdown"
       }
     ],
     "configuration": {
