@@ -56,7 +56,7 @@ export class MarkdownPreviewPanel {
   private _debouncedUpdateContent: ((_document: vscode.TextDocument) => void) | undefined
 
   public static async createOrShowSlide(extensionUri: vscode.Uri, document?: vscode.TextDocument): Promise<MarkdownPreviewPanel> {
-    return MarkdownPreviewPanel._createOrShow(extensionUri, vscode.ViewColumn.Two, document)
+    return MarkdownPreviewPanel._createOrShow(extensionUri, vscode.ViewColumn.Beside, document)
   }
 
   public static async createOrShowFull(extensionUri: vscode.Uri, document?: vscode.TextDocument): Promise<MarkdownPreviewPanel> {
