@@ -4,6 +4,20 @@
 let scrollSyncManager = null
 let searchHighlightManager = null
 
+function scrollElementToTop(element) {
+  const rect = element.getBoundingClientRect()
+  const currentTop = window.pageYOffset || document.documentElement.scrollTop || 0
+  window.scrollTo({
+    top: Math.max(0, Math.round(currentTop + rect.top)),
+    left: 0,
+    behavior: 'auto',
+  })
+  document.documentElement.scrollLeft = 0
+  if (document.body) {
+    document.body.scrollLeft = 0
+  }
+}
+
 /**
  * 初始化滚动同步
  */
@@ -123,7 +137,7 @@ function handleExtensionMessage(event) {
         // 如果 ScrollSyncManager 未初始化，直接滚动到行
         const element = document.querySelector(`[data-line="${message.line}"]`)
         if (element) {
-          element.scrollIntoView({ behavior: 'instant', block: 'start' })
+          scrollElementToTop(element)
         }
       }
       break

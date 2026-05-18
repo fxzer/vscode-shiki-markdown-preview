@@ -37,6 +37,7 @@
 /* 布局相关样式 - 不依赖主题变量 */
 html {
   font-size: var(--font-size, 14px);
+  overflow-x: hidden;
 }
 
 body {
@@ -52,7 +53,7 @@ body {
 }
 
 .container {
-  max-width: var(--document-width, 800px);
+  max-width: min(var(--document-width, 800px), 100%);
   margin: 0 auto;
   padding: 0;
   box-sizing: border-box;
@@ -229,10 +230,13 @@ ol ul {
 
 /* 表格样式增强 */
 table {
+  display: block;
   border-collapse: collapse;
   border-spacing: 0;
   margin-bottom: 1rem;
   width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 table th:first-child,

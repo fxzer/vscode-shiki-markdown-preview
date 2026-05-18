@@ -80,6 +80,7 @@ class IntersectionBasedScrollSync {
       initialScrollTop: window.pageYOffset || document.documentElement.scrollTop || 0,
       userAgent: navigator.userAgent,
     })
+    this.resetHorizontalScroll('manager-init')
   }
 
   isDebugEnabled() {
@@ -94,17 +95,72 @@ class IntersectionBasedScrollSync {
 
   getScrollSnapshot() {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0
+    const scrollLeft = this.getHorizontalScrollLeft()
     const scrollHeight = document.documentElement.scrollHeight || 0
     const clientHeight = document.documentElement.clientHeight || 0
+    const scrollWidth = document.documentElement.scrollWidth || 0
+    const clientWidth = document.documentElement.clientWidth || 0
     const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
+    const maxScrollLeft = Math.max(0, scrollWidth - clientWidth)
 
     return {
       scrollTop,
+      scrollLeft,
       scrollHeight,
       clientHeight,
+      scrollWidth,
+      clientWidth,
       maxScrollTop,
+      maxScrollLeft,
       scrollPercent: maxScrollTop > 0 ? Number((scrollTop / maxScrollTop).toFixed(4)) : 0,
+      horizontalScrollPercent: maxScrollLeft > 0 ? Number((scrollLeft / maxScrollLeft).toFixed(4)) : 0,
     }
+  }
+
+  getHorizontalScrollLeft() {
+    return window.scrollX
+      || window.pageXOffset
+      || document.documentElement.scrollLeft
+      || document.body?.scrollLeft
+      || 0
+  }
+
+  resetHorizontalScroll(reason) {
+    const before = {
+      windowScrollX: window.scrollX || 0,
+      pageXOffset: window.pageXOffset || 0,
+      documentScrollLeft: document.documentElement.scrollLeft || 0,
+      bodyScrollLeft: document.body?.scrollLeft || 0,
+    }
+    const left = Math.max(
+      Math.abs(before.windowScrollX),
+      Math.abs(before.pageXOffset),
+      Math.abs(before.documentScrollLeft),
+      Math.abs(before.bodyScrollLeft),
+    )
+
+    if (left < 1) {
+      return false
+    }
+
+    const top = window.pageYOffset || document.documentElement.scrollTop || 0
+    window.scrollTo({ top, left: 0, behavior: 'auto' })
+    document.documentElement.scrollLeft = 0
+    if (document.body) {
+      document.body.scrollLeft = 0
+    }
+
+    this.postDebugLog('horizontal-scroll-reset', {
+      reason,
+      before,
+      after: {
+        windowScrollX: window.scrollX || 0,
+        pageXOffset: window.pageXOffset || 0,
+        documentScrollLeft: document.documentElement.scrollLeft || 0,
+        bodyScrollLeft: document.body?.scrollLeft || 0,
+      },
+    })
+    return true
   }
 
   getVisibleSnapshot(limit = 8) {
@@ -247,6 +303,7 @@ class IntersectionBasedScrollSync {
   handleScroll() {
     this.debugCounter++
     const logPrefix = `[Webview ScrollSync#${this.debugCounter}]`
+    const horizontalWasReset = this.resetHorizontalScroll('preview-scroll-event')
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop
     const scrollHeight = document.documentElement.scrollHeight
     const clientHeight = document.documentElement.clientHeight
@@ -259,6 +316,7 @@ class IntersectionBasedScrollSync {
       scrollDirection,
       scrollHeight,
       clientHeight,
+      horizontalWasReset,
       scroll: scrollSnapshot,
       visibleSnapshot: this.getVisibleSnapshot(8),
       msSinceLastIntersection: this.lastIntersectionAt === null
@@ -553,6 +611,37 @@ class IntersectionBasedScrollSync {
     return previous ?? next
   }
 
+  scrollWindowToElement(element) {
+    const beforeScroll = this.getScrollSnapshot()
+    const beforeRect = element.getBoundingClientRect()
+    const currentTop = window.pageYOffset || document.documentElement.scrollTop || 0
+    const targetTop = Math.max(0, Math.round(currentTop + beforeRect.top))
+
+    window.scrollTo({
+      top: targetTop,
+      left: 0,
+      behavior: 'auto',
+    })
+    this.resetHorizontalScroll('sync-to-preview-after-window-scroll')
+
+    const afterRect = element.getBoundingClientRect()
+    return {
+      targetTop,
+      beforeScroll,
+      afterScroll: this.getScrollSnapshot(),
+      beforeRect: {
+        top: Number(beforeRect.top.toFixed(2)),
+        bottom: Number(beforeRect.bottom.toFixed(2)),
+        height: Number(beforeRect.height.toFixed(2)),
+      },
+      afterRect: {
+        top: Number(afterRect.top.toFixed(2)),
+        bottom: Number(afterRect.bottom.toFixed(2)),
+        height: Number(afterRect.height.toFixed(2)),
+      },
+    }
+  }
+
   scrollToLine(line) {
     const startTime = Date.now()
     console.log(`[Webview ScrollSync] 滚动到指定行: 行号=${line}, 当前状态: isSyncing=${this.isSyncing}, source=${this.syncSource}, currentTopLine=${this.currentTopLine}`)
@@ -612,22 +701,18 @@ class IntersectionBasedScrollSync {
     this.syncSource = 'editor'
     this.currentTopLine = target.line
 
-    // 使用 scrollIntoView 滚动到元素
-    // behavior: instant 避免动画延迟
-    element.scrollIntoView({
-      behavior: 'instant',
-      block: 'start',
-    })
+    const scrollResult = this.scrollWindowToElement(element)
 
     const elapsed = Date.now() - startTime
     console.log(`[Webview ScrollSync] 滚动完成: 行 ${line}, 耗时 ${elapsed}ms`)
-    this.postDebugLog('sync-to-preview-scroll-into-view-called', {
+    this.postDebugLog('sync-to-preview-window-scroll-called', {
       requestedLine: line,
       targetLine: target.line,
       exact: target.exact,
       elapsed,
       beforeScroll,
-      afterScroll: this.getScrollSnapshot(),
+      targetTop: scrollResult.targetTop,
+      scrollResult,
       visibleSnapshot: this.getVisibleSnapshot(12),
     })
     this.schedulePreviewPositionProbes(line, 'after-editor-sync')

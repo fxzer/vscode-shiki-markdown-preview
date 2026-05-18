@@ -23,6 +23,9 @@ export class ScrollSyncManager {
   private _lastEditorTopLine: number | null = null
   private _ignoreEditorScrollUntil: number = 0
   private _pendingPreviewTargetLine: number | null = null
+  private _pendingEditorTopLine: number | null = null
+  private _lastPreviewSyncedLine: number | null = null
+  private _lastPreviewSyncSentAt: number = 0
   private _lastPreviewSync: {
     requestedLine: number
     targetLine: number | null
@@ -33,7 +36,9 @@ export class ScrollSyncManager {
   // 性能优化参数
   private readonly _SYNC_BLOCK_MS = 30 // 同步阻塞时间，防止循环
   private readonly _PREVIEW_TO_EDITOR_ECHO_BLOCK_MS = 250
+  private readonly _EDITOR_TO_PREVIEW_THROTTLE_MS = 40
   private _syncTimeout: NodeJS.Timeout | null = null
+  private _previewSyncTimeout: NodeJS.Timeout | null = null
 
   // 调试日志计数器
   private _debugCounter: number = 0
@@ -81,7 +86,9 @@ export class ScrollSyncManager {
     this._syncSource = null
     this._ignoreEditorScrollUntil = 0
     this._pendingPreviewTargetLine = null
+    this._pendingEditorTopLine = null
     this.clearSyncTimeout()
+    this.clearPreviewSyncTimeout()
     this.logDebug('manager-disabled')
   }
 
@@ -130,6 +137,8 @@ export class ScrollSyncManager {
         currentLine: this._currentLine,
         ignoreEditorScrollForMs: Math.max(0, this._ignoreEditorScrollUntil - Date.now()),
         pendingPreviewTargetLine: this._pendingPreviewTargetLine,
+        pendingEditorTopLine: this._pendingEditorTopLine,
+        lastPreviewSyncedLine: this._lastPreviewSyncedLine,
       },
       ...payload,
     }
@@ -331,7 +340,75 @@ export class ScrollSyncManager {
     this._currentLine = topLine
     this._pendingPreviewTargetLine = null
     this._ignoreEditorScrollUntil = 0
-    this.syncToPreview(topLine)
+    this.scheduleSyncToPreview(topLine)
+  }
+
+  private scheduleSyncToPreview(line: number): void {
+    const now = Date.now()
+    const elapsedSinceLastSync = now - this._lastPreviewSyncSentAt
+    const delay = Math.max(0, this._EDITOR_TO_PREVIEW_THROTTLE_MS - elapsedSinceLastSync)
+
+    if (line === this._lastPreviewSyncedLine && this._pendingEditorTopLine === null) {
+      this.logDebug('sync-to-preview-schedule-skipped', {
+        reason: 'already-synced',
+        line,
+      })
+      return
+    }
+
+    this._pendingEditorTopLine = line
+    this.logDebug('sync-to-preview-scheduled', {
+      line,
+      delay,
+      elapsedSinceLastSync,
+    })
+
+    if (this._previewSyncTimeout) {
+      return
+    }
+
+    if (delay === 0) {
+      this.flushPendingPreviewSync('immediate')
+      return
+    }
+
+    this._previewSyncTimeout = setTimeout(() => {
+      this._previewSyncTimeout = null
+      this.flushPendingPreviewSync('throttled')
+    }, delay)
+  }
+
+  private flushPendingPreviewSync(reason: string): void {
+    if (this._previewSyncTimeout) {
+      clearTimeout(this._previewSyncTimeout)
+      this._previewSyncTimeout = null
+    }
+
+    const line = this._pendingEditorTopLine
+    this._pendingEditorTopLine = null
+
+    if (line === null) {
+      this.logDebug('sync-to-preview-flush-skipped', {
+        reason,
+        skippedReason: 'no-pending-line',
+      })
+      return
+    }
+
+    if (line === this._lastPreviewSyncedLine) {
+      this.logDebug('sync-to-preview-flush-skipped', {
+        reason,
+        skippedReason: 'already-synced',
+        line,
+      })
+      return
+    }
+
+    this.logDebug('sync-to-preview-flush', {
+      reason,
+      line,
+    })
+    this.syncToPreview(line)
   }
 
   /**
@@ -377,6 +454,8 @@ export class ScrollSyncManager {
       line,
     })
     console.log(`[ScrollSyncManager] 发送同步消息到预览: 行号=${line}, 发送结果=${success}`)
+    this._lastPreviewSyncedLine = line
+    this._lastPreviewSyncSentAt = Date.now()
     this.logDebug('sync-to-preview-message-sent', {
       line,
       postMessageResult: success,
@@ -423,6 +502,8 @@ export class ScrollSyncManager {
     // 激活状态锁：标记为预览触发的同步
     this._isSyncing = true
     this._syncSource = 'preview'
+    this._pendingEditorTopLine = null
+    this.clearPreviewSyncTimeout()
 
     const editor = this.getCurrentEditor()
 
@@ -469,6 +550,7 @@ export class ScrollSyncManager {
 
       // 更新当前行号
       this._currentLine = targetLine
+      this._lastPreviewSyncedLine = targetLine
       const elapsed = Date.now() - startTime
       console.log(`[ScrollSyncManager] 编辑器滚动完成: 行 ${targetLine}, 耗时 ${elapsed}ms`)
       this.logDebug('editor-reveal-range-called', {
@@ -532,6 +614,8 @@ export class ScrollSyncManager {
     this._isEnabled = false
     this._ignoreEditorScrollUntil = 0
     this._pendingPreviewTargetLine = null
+    this._pendingEditorTopLine = null
+    this.clearPreviewSyncTimeout()
   }
 
   /**
@@ -541,6 +625,13 @@ export class ScrollSyncManager {
     if (this._syncTimeout) {
       clearTimeout(this._syncTimeout)
       this._syncTimeout = null
+    }
+  }
+
+  private clearPreviewSyncTimeout(): void {
+    if (this._previewSyncTimeout) {
+      clearTimeout(this._previewSyncTimeout)
+      this._previewSyncTimeout = null
     }
   }
 }
