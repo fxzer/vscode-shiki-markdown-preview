@@ -184,6 +184,11 @@
           "default": true,
           "description": "启用预览区与编辑区的同步滚动功能。当启用时，滚动编辑器或预览区时，另一个区域会自动同步滚动到对应位置。"
         },
+        "shikiMarkdownPreview.enableScrollSyncDebug": {
+          "type": "boolean",
+          "default": false,
+          "description": "启用滚动同步排查日志。只建议排查滚动问题时打开，日志会写入 Output 面板的 Shiki Markdown Preview Scroll Sync。"
+        },
         "shikiMarkdownPreview.expandTocByDefault": {
           "type": "boolean",
           "default": false,

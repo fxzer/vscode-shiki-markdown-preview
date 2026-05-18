@@ -140,6 +140,13 @@ function handleExtensionMessage(event) {
       }
       break
     }
+    case 'updateScrollSyncDebugState': {
+      window.scrollSyncDebug = Boolean(message.enabled)
+      if (scrollSyncManager && scrollSyncManager.setDebugEnabled) {
+        scrollSyncManager.setDebugEnabled(message.enabled)
+      }
+      break
+    }
     case 'updateDocumentWidth': {
       // 更新文档宽度CSS变量
       document.documentElement.style.setProperty('--document-width', message.width)
@@ -234,9 +241,6 @@ window.addEventListener('load', () => {
     )
   }
 })
-
-// 设置全局消息监听器
-window.addEventListener('message', handleExtensionMessage)
 
 // 导出给外部使用
 if (typeof module !== 'undefined' && module.exports) {

@@ -32,6 +32,14 @@ export class ConfigService {
   }
 
   /**
+   * 是否输出滚动同步排查日志
+   */
+  public getScrollSyncDebugEnabled(): boolean {
+    const config = vscode.workspace.getConfiguration(ConfigService.SECTION)
+    return config.get<boolean>('enableScrollSyncDebug', false)
+  }
+
+  /**
    * 更新配置
    */
   public async updateConfig(key: string, value: any, target: vscode.ConfigurationTarget): Promise<void> {

@@ -165,6 +165,14 @@ export class MarkdownPreviewPanel {
   }
 
   /**
+   * 获取滚动同步排查日志设置
+   */
+  private getScrollSyncDebugSetting(): boolean {
+    const config = vscode.workspace.getConfiguration('shikiMarkdownPreview')
+    return config.get<boolean>('enableScrollSyncDebug', false)
+  }
+
+  /**
    * 获取目录展开设置
    */
   private getTocExpandSetting(): boolean {
@@ -487,6 +495,7 @@ export class MarkdownPreviewPanel {
       documentWidth, // 传递文档宽度
       fontFamily, // 传递字体设置
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
+      enableScrollSyncDebug: this.getScrollSyncDebugSetting(), // 传递滚动同步排查日志设置
       enableKatex, // 传递 KaTeX 启用状态
       expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     })
@@ -552,6 +561,7 @@ export class MarkdownPreviewPanel {
       markdownThemeType: this._themeService.getCurrentThemeType(), // 传递主题类型
       documentWidth, // 传递文档宽度
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
+      enableScrollSyncDebug: this.getScrollSyncDebugSetting(), // 传递滚动同步排查日志设置
       expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     })
   }
@@ -576,6 +586,7 @@ export class MarkdownPreviewPanel {
       markdownThemeType: this._themeService.getCurrentThemeType(), // 传递主题类型
       documentWidth, // 传递文档宽度
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
+      enableScrollSyncDebug: this.getScrollSyncDebugSetting(), // 传递滚动同步排查日志设置
       expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     })
   }

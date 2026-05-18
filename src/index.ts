@@ -166,6 +166,17 @@ export function activate(context: vscode.ExtensionContext) {
           })
         }
       }
+
+      if (event.affectsConfiguration('shikiMarkdownPreview.enableScrollSyncDebug')) {
+        if (MarkdownPreviewPanel.currentPanel) {
+          const enableScrollSyncDebug = configService.getScrollSyncDebugEnabled()
+          MarkdownPreviewPanel.currentPanel.scrollSyncManager?.setDebugEnabled(enableScrollSyncDebug)
+          MarkdownPreviewPanel.currentPanel.panel.webview.postMessage({
+            command: 'updateScrollSyncDebugState',
+            enabled: enableScrollSyncDebug,
+          })
+        }
+      }
     }),
   )
 

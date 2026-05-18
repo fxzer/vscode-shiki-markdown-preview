@@ -13,6 +13,7 @@ export interface HTMLTemplateOptions {
   documentWidth?: string
   fontFamily?: string
   enableScrollSync?: boolean
+  enableScrollSyncDebug?: boolean
   enableKatex?: boolean
   expandTocByDefault?: boolean
 }
@@ -33,6 +34,7 @@ export class HTMLTemplateService {
       documentWidth = '800px',
       fontFamily = 'inherit',
       enableScrollSync = true,
+      enableScrollSyncDebug = false,
       enableKatex = false,
       expandTocByDefault = false,
     } = options
@@ -96,6 +98,9 @@ export class HTMLTemplateService {
                     window.tocConfig = {
                         expandTocByDefault: ${expandTocByDefault ? 'true' : 'false'}
                     };
+
+                    // 滚动同步排查日志开关
+                    window.scrollSyncDebug = ${enableScrollSyncDebug ? 'true' : 'false'};
 
                     // 初始化 VS Code API
                     let vscode;
