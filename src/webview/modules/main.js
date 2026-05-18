@@ -73,6 +73,18 @@ function handleExtensionMessage(event) {
     case 'updateContent': {
       const markdownContent = document.getElementById('markdown-content')
       if (markdownContent) {
+        if (searchHighlightManager) {
+          searchHighlightManager.clearHighlightsDOM()
+        }
+
+        window.frontMatterData = message.frontMatterData || {}
+        window.tocConfig = {
+          expandTocByDefault: Boolean(message.expandTocByDefault),
+        }
+        if (message.markdownThemeType) {
+          document.documentElement.setAttribute('data-markdown-theme-type', message.markdownThemeType)
+        }
+
         markdownContent.innerHTML = message.content
 
         // 重新应用语法高亮
@@ -121,10 +133,13 @@ function handleExtensionMessage(event) {
           )
         }
 
-        // 延迟重新初始化滚动同步
-        setTimeout(() => {
+        if (searchHighlightManager && searchHighlightManager.isVisible && searchHighlightManager.currentQuery) {
+          searchHighlightManager.performSearch()
+        }
+
+        requestAnimationFrame(() => {
           initializeScrollSync()
-        }, 300)
+        })
       }
       break
     }

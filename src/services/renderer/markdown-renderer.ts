@@ -561,13 +561,18 @@ export class MarkdownRenderer {
       this._markdownIt.renderer.rules.dd_open = (tokens, idx, options, env, renderer) =>
         addLineNumber(tokens, idx, options, env, renderer, 'dd_open')
 
-      // 渲染 HTML
-      const html = this._markdownIt.render(markdownContent)
+      try {
+        // 渲染 HTML
+        const html = this._markdownIt.render(markdownContent)
 
-      // 验证 data-line 属性的完整性
-      this.validateLineMapping(html, lines.length)
+        // 验证 data-line 属性的完整性
+        this.validateLineMapping(html, lines.length)
 
-      return html
+        return html
+      }
+      finally {
+        Object.assign(this._markdownIt.renderer.rules, originalRules)
+      }
     }
     catch (error) {
       ErrorHandler.handleRenderError(error, 'Markdown 渲染')
@@ -589,7 +594,6 @@ export class MarkdownRenderer {
    */
   private async _preloadLanguagesForContent(content: string): Promise<void> {
     try {
-      // 获取检测到的语言
       const languages = detectLanguages(content)
 
       if (languages.length === 0) {
@@ -598,8 +602,7 @@ export class MarkdownRenderer {
 
       ErrorHandler.logInfo(`内容分析: ${languages.length} 种语言`, 'MarkdownRenderer')
 
-      // 预加载检测到的语言
-      await this._themeService.preloadLanguagesFromContent(content)
+      await this._themeService.preloadLanguages(languages)
     }
     catch {
       ErrorHandler.logWarning('语言预加载失败', 'MarkdownRenderer')

@@ -3,8 +3,6 @@ import { ConfigService, MarkdownPreviewPanel, MarkdownPreviewSerializer, showThe
 import { DocumentValidator, ErrorHandler } from './utils'
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Shiki Markdown Preview is activating...')
-
   const configService = new ConfigService()
 
   // 首次安装时显示 Cursor 图标配置提示
@@ -21,11 +19,9 @@ export function activate(context: vscode.ExtensionContext) {
     }, 2000)
   }
 
-  console.log('Shiki Markdown Preview commands registered successfully!')
   // 注册 markdown 预览命令 - 侧边预览 (ViewColumn.Two)
   context.subscriptions.push(
     vscode.commands.registerCommand('shikiMarkdownPreview.openPreviewSlide', () => {
-      console.log('Command executed: shikiMarkdownPreview.openPreviewSlide')
       const markdownDocument = DocumentValidator.validateMarkdownDocument()
       if (markdownDocument) {
         MarkdownPreviewPanel.createOrShowSlide(context.extensionUri, markdownDocument)
@@ -96,8 +92,8 @@ export function activate(context: vscode.ExtensionContext) {
         // 只有在切换到不同的 markdown 文件时才更新预览
         const currentDocument = MarkdownPreviewPanel.currentPanel.currentDocument
         if (!currentDocument || editor!.document !== currentDocument) {
-          ErrorHandler.safeExecuteSync(
-            () => MarkdownPreviewPanel.currentPanel!.updateContentDebounced(editor!.document),
+          void ErrorHandler.safeExecute(
+            () => MarkdownPreviewPanel.currentPanel!.updateContent(editor!.document),
             '活动编辑器内容更新失败',
             'Extension',
           )

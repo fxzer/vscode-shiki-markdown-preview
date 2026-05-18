@@ -10,6 +10,7 @@ class NotionToc {
     this.tocItems = []
 
     this.observer = null
+    this.contentObserver = null
     this.isManualScrolling = false // 标志位：是否正在手动滚动
 
     // 读取目录展开配置
@@ -231,11 +232,15 @@ class NotionToc {
     if (!content)
       return
 
-    const observer = new MutationObserver(() => {
+    if (this.contentObserver) {
+      this.contentObserver.disconnect()
+    }
+
+    this.contentObserver = new MutationObserver(() => {
       this.refresh()
     })
 
-    observer.observe(content, { childList: true, subtree: true })
+    this.contentObserver.observe(content, { childList: true, subtree: true })
   }
 
   refresh() {
@@ -255,9 +260,15 @@ class NotionToc {
     if (this.observer) {
       this.observer.disconnect()
     }
+    if (this.contentObserver) {
+      this.contentObserver.disconnect()
+    }
     if (this.tocContainer) {
       this.tocContainer.remove()
     }
+    this.headers = []
+    this.lineBars = []
+    this.tocItems = []
   }
 }
 

@@ -35,13 +35,16 @@ class IntersectionBasedScrollSync {
     this.lastCalculatedLine = null
     this.lastIntersectionAt = null
     this.scrollStopTimeout = null
+    this.reobserveTimeout = null
+    this.boundHandleScroll = this.handleScroll.bind(this)
+    this.domContentLoadedHandler = null
 
-    console.log('[Webview ScrollSync] 初始化滚动同步管理器')
+    this.logConsole('[Webview ScrollSync] 初始化滚动同步管理器')
     this.init()
   }
 
   init() {
-    console.log('[Webview ScrollSync] 开始初始化')
+    this.logConsole('[Webview ScrollSync] 开始初始化')
 
     // 配置 Intersection Observer
     // rootMargin 用于忽略顶部和底部 10% 的区域，只关注主要可见内容
@@ -52,25 +55,25 @@ class IntersectionBasedScrollSync {
         rootMargin: '-10% 0px -10% 0px', // 忽略边缘元素，关注核心内容
       },
     )
-    console.log('[Webview ScrollSync] Intersection Observer 已配置')
+    this.logConsole('[Webview ScrollSync] Intersection Observer 已配置')
 
     // 等待 DOM 加载完成后观察元素
     if (document.readyState === 'loading') {
-      console.log('[Webview ScrollSync] DOM 尚未加载完成，等待 DOMContentLoaded')
-      document.addEventListener('DOMContentLoaded', () =>
-        this.observeElements())
+      this.logConsole('[Webview ScrollSync] DOM 尚未加载完成，等待 DOMContentLoaded')
+      this.domContentLoadedHandler = () => this.observeElements()
+      document.addEventListener('DOMContentLoaded', this.domContentLoadedHandler, { once: true })
     }
     else {
       this.observeElements()
     }
 
     // 监听用户滚动 - 使用 passive 提升性能
-    window.addEventListener('scroll', this.handleScroll.bind(this), {
+    window.addEventListener('scroll', this.boundHandleScroll, {
       passive: true,
     })
-    console.log('[Webview ScrollSync] 滚动事件监听器已注册')
+    this.logConsole('[Webview ScrollSync] 滚动事件监听器已注册')
 
-    console.log('[Webview ScrollSync] 初始化完成，配置参数:', {
+    this.logConsole('[Webview ScrollSync] 初始化完成，配置参数:', {
       SYNC_BLOCK_MS: this.SYNC_BLOCK_MS,
       SCROLL_DEBOUNCE_MS: this.SCROLL_DEBOUNCE_MS,
     })
@@ -85,6 +88,18 @@ class IntersectionBasedScrollSync {
 
   isDebugEnabled() {
     return Boolean(this.debugEnabled || window.scrollSyncDebug)
+  }
+
+  logConsole(...args) {
+    if (this.isDebugEnabled()) {
+      console.warn(...args)
+    }
+  }
+
+  warnConsole(...args) {
+    if (this.isDebugEnabled()) {
+      console.warn(...args)
+    }
   }
 
   setDebugEnabled(enabled) {
@@ -221,7 +236,7 @@ class IntersectionBasedScrollSync {
    */
   observeElements() {
     const elements = document.querySelectorAll('[data-line]')
-    console.log(`[Webview ScrollSync] 开始观察元素，找到 ${elements.length} 个带 data-line 的元素`)
+    this.logConsole(`[Webview ScrollSync] 开始观察元素，找到 ${elements.length} 个带 data-line 的元素`)
     this.postDebugLog('observe-elements-start', {
       elementCount: elements.length,
       firstLines: Array.from(elements)
@@ -235,7 +250,7 @@ class IntersectionBasedScrollSync {
     })
 
     if (elements.length === 0) {
-      console.warn('[Webview ScrollSync] 未找到带 data-line 属性的元素')
+      this.warnConsole('[Webview ScrollSync] 未找到带 data-line 属性的元素')
       this.postDebugLog('observe-elements-empty')
       return
     }
@@ -243,12 +258,12 @@ class IntersectionBasedScrollSync {
     elements.forEach((el, index) => {
       this.observer.observe(el)
       if (index < 5) {
-        console.log(`[Webview ScrollSync] 观察元素 ${index + 1}: data-line="${el.dataset.line}"`)
+        this.logConsole(`[Webview ScrollSync] 观察元素 ${index + 1}: data-line="${el.dataset.line}"`)
       }
     })
 
     if (elements.length > 5) {
-      console.log(`[Webview ScrollSync] ... 以及其他 ${elements.length - 5} 个元素`)
+      this.logConsole(`[Webview ScrollSync] ... 以及其他 ${elements.length - 5} 个元素`)
     }
   }
 
@@ -280,16 +295,16 @@ class IntersectionBasedScrollSync {
           top: entry.boundingClientRect.top,
           bottom: entry.boundingClientRect.bottom,
         })
-        console.log(`${logPrefix} 元素进入视口: 行号=${lineNumber}, 可见比例=${(entry.intersectionRatio * 100).toFixed(1)}%`)
+        this.logConsole(`${logPrefix} 元素进入视口: 行号=${lineNumber}, 可见比例=${(entry.intersectionRatio * 100).toFixed(1)}%`)
       }
       else {
         // 元素离开视口
         this.visibleElements.delete(lineNumber)
-        console.log(`${logPrefix} 元素离开视口: 行号=${lineNumber}`)
+        this.logConsole(`${logPrefix} 元素离开视口: 行号=${lineNumber}`)
       }
     })
 
-    console.log(`${logPrefix} 当前可见元素数量: ${this.visibleElements.size}`)
+    this.logConsole(`${logPrefix} 当前可见元素数量: ${this.visibleElements.size}`)
     this.postDebugLog('intersection-change', {
       changedEntries,
       visibleSnapshot: this.getVisibleSnapshot(10),
@@ -337,7 +352,7 @@ class IntersectionBasedScrollSync {
     }, 120)
 
     if (!this.isEnabled) {
-      console.log(`${logPrefix} 滚动事件被忽略: 滚动同步未启用`)
+      this.logConsole(`${logPrefix} 滚动事件被忽略: 滚动同步未启用`)
       this.postDebugLog('preview-scroll-ignored', {
         reason: 'sync-disabled',
         scroll: scrollSnapshot,
@@ -347,7 +362,7 @@ class IntersectionBasedScrollSync {
 
     // 如果是编辑器触发的同步，忽略
     if (this.isSyncing && this.syncSource === 'editor') {
-      console.log(`${logPrefix} 滚动事件被忽略: 正在同步中 (source=editor), 滚动位置=${scrollTop}`)
+      this.logConsole(`${logPrefix} 滚动事件被忽略: 正在同步中 (source=editor), 滚动位置=${scrollTop}`)
       this.postDebugLog('preview-scroll-ignored', {
         reason: 'lock-from-editor',
         scroll: scrollSnapshot,
@@ -356,7 +371,7 @@ class IntersectionBasedScrollSync {
       return
     }
 
-    console.log(`${logPrefix} 用户滚动: 滚动位置=${scrollTop}, 可见元素数量=${this.visibleElements.size}, 当前顶部行=${this.currentTopLine}, isSyncing=${this.isSyncing}, source=${this.syncSource}`)
+    this.logConsole(`${logPrefix} 用户滚动: 滚动位置=${scrollTop}, 可见元素数量=${this.visibleElements.size}, 当前顶部行=${this.currentTopLine}, isSyncing=${this.isSyncing}, source=${this.syncSource}`)
 
     // 使用 requestAnimationFrame 代替 setTimeout，性能更好
     if (this.scrollTimeout) {
@@ -365,13 +380,13 @@ class IntersectionBasedScrollSync {
 
     // 立即同步一次，然后使用防抖处理后续滚动
     if (!this.scrollTimeout) {
-      console.log(`${logPrefix} 立即执行同步`)
+      this.logConsole(`${logPrefix} 立即执行同步`)
       this.syncScrollToEditor()
     }
 
     this.scrollTimeout = setTimeout(() => {
       this.scrollTimeout = null
-      console.log(`${logPrefix} 防抖后执行同步`)
+      this.logConsole(`${logPrefix} 防抖后执行同步`)
       this.syncScrollToEditor()
     }, this.SCROLL_DEBOUNCE_MS)
   }
@@ -382,7 +397,7 @@ class IntersectionBasedScrollSync {
   syncScrollToEditor() {
     const topLine = this.getTopVisibleLine()
 
-    console.log(`[Webview ScrollSync] 尝试同步到编辑器: 计算顶部行=${topLine}, 当前顶部行=${this.currentTopLine}`)
+    this.logConsole(`[Webview ScrollSync] 尝试同步到编辑器: 计算顶部行=${topLine}, 当前顶部行=${this.currentTopLine}`)
     this.postDebugLog('sync-to-editor-calculated', {
       calculatedTopLine: topLine,
       currentTopLine: this.currentTopLine,
@@ -396,7 +411,7 @@ class IntersectionBasedScrollSync {
       this.sendScrollMessage(topLine)
     }
     else {
-      console.log(`[Webview ScrollSync] 跳过同步: topLine=${topLine}, 理由: ${topLine === null ? '未找到可见元素' : '行号未变化'}`)
+      this.logConsole(`[Webview ScrollSync] 跳过同步: topLine=${topLine}, 理由: ${topLine === null ? '未找到可见元素' : '行号未变化'}`)
       this.postDebugLog('sync-to-editor-skipped', {
         reason: topLine === null ? 'no-visible-element' : 'line-unchanged',
         calculatedTopLine: topLine,
@@ -410,10 +425,10 @@ class IntersectionBasedScrollSync {
    * 返回当前视口顶部最接近的元素行号
    */
   getTopVisibleLine() {
-    console.log(`[Webview ScrollSync] 获取顶部可见行号: 可见元素数量=${this.visibleElements.size}`)
+    this.logConsole(`[Webview ScrollSync] 获取顶部可见行号: 可见元素数量=${this.visibleElements.size}`)
 
     if (this.visibleElements.size === 0) {
-      console.log('[Webview ScrollSync] 没有可见元素，返回 null')
+      this.logConsole('[Webview ScrollSync] 没有可见元素，返回 null')
       return null
     }
 
@@ -427,12 +442,12 @@ class IntersectionBasedScrollSync {
 
     // IntersectionObserver 给的位置可能是旧的，这里必须重新读取真实位置。
     for (const [lineNumber, info] of this.visibleElements) {
-      console.log(`[Webview ScrollSync] 检查行 ${lineNumber}: top=${info.top.toFixed(2)}, ratio=${(info.ratio * 100).toFixed(1)}%`)
+      this.logConsole(`[Webview ScrollSync] 检查行 ${lineNumber}: top=${info.top.toFixed(2)}, ratio=${(info.ratio * 100).toFixed(1)}%`)
 
       if (info.top >= 0 && info.top < minTop) {
         minTop = info.top
         topLine = lineNumber
-        console.log(`[Webview ScrollSync] 更新顶部行: ${lineNumber} (top=${info.top.toFixed(2)})`)
+        this.logConsole(`[Webview ScrollSync] 更新顶部行: ${lineNumber} (top=${info.top.toFixed(2)})`)
       }
 
       const rect = info.element.getBoundingClientRect()
@@ -456,7 +471,7 @@ class IntersectionBasedScrollSync {
     }
 
     const selectedLine = firstVisibleLine ?? coveringTopLine ?? topLine
-    console.log(`[Webview ScrollSync] 最终返回顶部行: ${selectedLine}, 实时位置=${firstVisibleTop.toFixed(2)}, 旧位置行=${topLine}, 旧位置=${minTop.toFixed(2)}`)
+    this.logConsole(`[Webview ScrollSync] 最终返回顶部行: ${selectedLine}, 实时位置=${firstVisibleTop.toFixed(2)}, 旧位置行=${topLine}, 旧位置=${minTop.toFixed(2)}`)
     this.lastCalculatedLine = selectedLine
     this.postDebugLog('top-visible-line-calculated', {
       selectedByStoredTop: topLine,
@@ -475,7 +490,7 @@ class IntersectionBasedScrollSync {
    * 发送滚动消息到编辑器
    */
   sendScrollMessage(line) {
-    console.log(`[Webview ScrollSync] 发送滚动消息到编辑器: 行号=${line}, 当前状态: isSyncing=${this.isSyncing}, source=${this.syncSource}`)
+    this.logConsole(`[Webview ScrollSync] 发送滚动消息到编辑器: 行号=${line}, 当前状态: isSyncing=${this.isSyncing}, source=${this.syncSource}`)
     this.postDebugLog('send-preview-line-to-extension-start', {
       line,
       previousSentLine: this.lastSentLine,
@@ -493,7 +508,7 @@ class IntersectionBasedScrollSync {
         command: 'previewScrolledToLine',
         line,
       })
-      console.log(`[Webview ScrollSync] 消息已发送: command='previewScrolledToLine', line=${line}`)
+      this.logConsole(`[Webview ScrollSync] 消息已发送: command='previewScrolledToLine', line=${line}`)
       this.postDebugLog('send-preview-line-to-extension-done', {
         line,
       })
@@ -512,7 +527,7 @@ class IntersectionBasedScrollSync {
     }
 
     this.syncTimeout = setTimeout(() => {
-      console.log(`[Webview ScrollSync] 同步状态释放: ${this.SYNC_BLOCK_MS}ms 后释放预览锁`)
+      this.logConsole(`[Webview ScrollSync] 同步状态释放: ${this.SYNC_BLOCK_MS}ms 后释放预览锁`)
       this.postDebugLog('sync-lock-release', {
         releasedSource: 'preview',
         delay: this.SYNC_BLOCK_MS,
@@ -529,7 +544,7 @@ class IntersectionBasedScrollSync {
    */
   handleMessage(event) {
     const message = event.data
-    console.log(`[Webview ScrollSync] 收到扩展消息:`, message)
+    this.logConsole(`[Webview ScrollSync] 收到扩展消息:`, message)
     this.postDebugLog('extension-message-received', {
       command: message.command,
       line: message.line ?? null,
@@ -538,11 +553,11 @@ class IntersectionBasedScrollSync {
 
     switch (message.command) {
       case 'syncScrollToLine':
-        console.log(`[Webview ScrollSync] 处理同步命令: 滚动到行 ${message.line}`)
+        this.logConsole(`[Webview ScrollSync] 处理同步命令: 滚动到行 ${message.line}`)
         this.scrollToLine(message.line)
         break
       case 'updateScrollSyncState':
-        console.log(`[Webview ScrollSync] 更新同步状态: enabled=${message.enabled}`)
+        this.logConsole(`[Webview ScrollSync] 更新同步状态: enabled=${message.enabled}`)
         if (message.enabled) {
           this.enable()
         }
@@ -554,12 +569,12 @@ class IntersectionBasedScrollSync {
         this.setDebugEnabled(message.enabled)
         break
       case 'updateContent':
-        console.log(`[Webview ScrollSync] 内容更新，重新观察元素`)
+        this.logConsole(`[Webview ScrollSync] 内容更新，重新观察元素`)
         // 内容更新时重新观察元素
         this.reobserveElements()
         break
       default:
-        console.log(`[Webview ScrollSync] 未知命令: ${message.command}`)
+        this.logConsole(`[Webview ScrollSync] 未知命令: ${message.command}`)
     }
   }
 
@@ -644,7 +659,7 @@ class IntersectionBasedScrollSync {
 
   scrollToLine(line) {
     const startTime = Date.now()
-    console.log(`[Webview ScrollSync] 滚动到指定行: 行号=${line}, 当前状态: isSyncing=${this.isSyncing}, source=${this.syncSource}, currentTopLine=${this.currentTopLine}`)
+    this.logConsole(`[Webview ScrollSync] 滚动到指定行: 行号=${line}, 当前状态: isSyncing=${this.isSyncing}, source=${this.syncSource}, currentTopLine=${this.currentTopLine}`)
     const beforeScroll = this.getScrollSnapshot()
     this.postDebugLog('sync-to-preview-request', {
       requestedLine: line,
@@ -653,7 +668,7 @@ class IntersectionBasedScrollSync {
     })
 
     if (!this.isEnabled) {
-      console.log('[Webview ScrollSync] 滚动被忽略: 滚动同步未启用')
+      this.logConsole('[Webview ScrollSync] 滚动被忽略: 滚动同步未启用')
       this.postDebugLog('sync-to-preview-ignored', {
         reason: 'sync-disabled',
         requestedLine: line,
@@ -663,7 +678,7 @@ class IntersectionBasedScrollSync {
 
     // 如果是预览触发的同步，忽略
     if (this.isSyncing && this.syncSource === 'preview') {
-      console.log(`[Webview ScrollSync] 滚动被忽略: 正在同步中 (source=preview)`)
+      this.logConsole(`[Webview ScrollSync] 滚动被忽略: 正在同步中 (source=preview)`)
       this.postDebugLog('sync-to-preview-ignored', {
         reason: 'lock-from-preview',
         requestedLine: line,
@@ -674,7 +689,7 @@ class IntersectionBasedScrollSync {
 
     const target = this.findLineElement(line)
     if (!target) {
-      console.warn(`[Webview ScrollSync] 未找到行号 ${line} 对应的元素，可能元素已被移除或未正确标记`)
+      this.warnConsole(`[Webview ScrollSync] 未找到行号 ${line} 对应的元素，可能元素已被移除或未正确标记`)
       this.postDebugLog('sync-to-preview-ignored', {
         reason: 'target-element-missing',
         requestedLine: line,
@@ -684,7 +699,7 @@ class IntersectionBasedScrollSync {
 
     const element = target.element
     const rect = element.getBoundingClientRect()
-    console.log(`[Webview ScrollSync] 找到元素: 请求行号=${line}, 命中行号=${target.line}, exact=${target.exact}, 位置=${rect.top.toFixed(2)}`)
+    this.logConsole(`[Webview ScrollSync] 找到元素: 请求行号=${line}, 命中行号=${target.line}, exact=${target.exact}, 位置=${rect.top.toFixed(2)}`)
     this.postDebugLog('sync-to-preview-target-found', {
       requestedLine: line,
       targetLine: target.line,
@@ -704,7 +719,7 @@ class IntersectionBasedScrollSync {
     const scrollResult = this.scrollWindowToElement(element)
 
     const elapsed = Date.now() - startTime
-    console.log(`[Webview ScrollSync] 滚动完成: 行 ${line}, 耗时 ${elapsed}ms`)
+    this.logConsole(`[Webview ScrollSync] 滚动完成: 行 ${line}, 耗时 ${elapsed}ms`)
     this.postDebugLog('sync-to-preview-window-scroll-called', {
       requestedLine: line,
       targetLine: target.line,
@@ -723,7 +738,7 @@ class IntersectionBasedScrollSync {
     }
 
     this.syncTimeout = setTimeout(() => {
-      console.log(`[Webview ScrollSync] 同步状态释放: ${this.SYNC_BLOCK_MS}ms 后释放编辑器锁`)
+      this.logConsole(`[Webview ScrollSync] 同步状态释放: ${this.SYNC_BLOCK_MS}ms 后释放编辑器锁`)
       this.postDebugLog('sync-lock-release', {
         releasedSource: 'editor',
         delay: this.SYNC_BLOCK_MS,
@@ -739,8 +754,8 @@ class IntersectionBasedScrollSync {
    * 重新观察元素（内容更新时）
    */
   reobserveElements() {
-    console.log('[Webview ScrollSync] 重新观察元素（内容更新）')
-    console.log('[Webview ScrollSync] 断开旧观察，清空可见元素映射')
+    this.logConsole('[Webview ScrollSync] 重新观察元素（内容更新）')
+    this.logConsole('[Webview ScrollSync] 断开旧观察，清空可见元素映射')
     this.postDebugLog('reobserve-elements-start', {
       visibleCountBeforeClear: this.visibleElements.size,
       scroll: this.getScrollSnapshot(),
@@ -750,7 +765,11 @@ class IntersectionBasedScrollSync {
     this.visibleElements.clear()
 
     // 稍微延迟后重新观察，等待 DOM 更新完成
-    setTimeout(() => {
+    if (this.reobserveTimeout) {
+      clearTimeout(this.reobserveTimeout)
+    }
+    this.reobserveTimeout = setTimeout(() => {
+      this.reobserveTimeout = null
       this.observeElements()
     }, 100)
   }
@@ -759,7 +778,7 @@ class IntersectionBasedScrollSync {
    * 启用滚动同步
    */
   enable() {
-    console.log('[Webview ScrollSync] 启用滚动同步')
+    this.logConsole('[Webview ScrollSync] 启用滚动同步')
     this.isEnabled = true
     this.postDebugLog('manager-enabled')
   }
@@ -768,7 +787,7 @@ class IntersectionBasedScrollSync {
    * 禁用滚动同步
    */
   disable() {
-    console.log('[Webview ScrollSync] 禁用滚动同步')
+    this.logConsole('[Webview ScrollSync] 禁用滚动同步')
     this.postDebugLog('manager-disabled')
     this.isEnabled = false
     this.isSyncing = false
@@ -788,13 +807,18 @@ class IntersectionBasedScrollSync {
       clearTimeout(this.scrollStopTimeout)
       this.scrollStopTimeout = null
     }
+
+    if (this.reobserveTimeout) {
+      clearTimeout(this.reobserveTimeout)
+      this.reobserveTimeout = null
+    }
   }
 
   /**
    * 清理资源
    */
   destroy() {
-    console.log('[Webview ScrollSync] 清理资源')
+    this.logConsole('[Webview ScrollSync] 清理资源')
     this.postDebugLog('manager-destroy')
     // 断开观察器
     if (this.observer) {
@@ -816,6 +840,20 @@ class IntersectionBasedScrollSync {
     if (this.scrollStopTimeout) {
       clearTimeout(this.scrollStopTimeout)
       this.scrollStopTimeout = null
+    }
+
+    if (this.reobserveTimeout) {
+      clearTimeout(this.reobserveTimeout)
+      this.reobserveTimeout = null
+    }
+
+    if (this.boundHandleScroll) {
+      window.removeEventListener('scroll', this.boundHandleScroll)
+    }
+
+    if (this.domContentLoadedHandler) {
+      document.removeEventListener('DOMContentLoaded', this.domContentLoadedHandler)
+      this.domContentLoadedHandler = null
     }
 
     // 清空映射

@@ -1,7 +1,9 @@
+import type { debounce as DebouncedFunction } from 'throttle-debounce'
 import { debounce } from 'throttle-debounce'
 import * as vscode from 'vscode'
 
 import {
+  ConfigService,
   HTMLTemplateService,
   StateManager,
   ThemeService,
@@ -31,6 +33,7 @@ export class MarkdownPreviewPanel {
   private _themeService: ThemeService
   private _markdownRenderer: MarkdownRenderer
   private _stateManager: StateManager
+  private _configService: ConfigService
   private _scrollSyncManager: ScrollSyncManager | undefined
 
   /**
@@ -43,9 +46,14 @@ export class MarkdownPreviewPanel {
   // 状态
   private _currentDocument: vscode.TextDocument | undefined
   private _isInitialized: boolean = false
-  private _lastRenderedContent: string | undefined
+  private _lastRenderedDocumentUri: string | undefined
   private _lastRenderedDocumentVersion: number | undefined
   private _lastRenderedTheme: string | undefined
+  private _lastRenderUsedKatex: boolean = false
+  private _hasRenderedWebview: boolean = false
+  private _isWebviewReady: boolean = false
+  private _renderGeneration: number = 0
+  private _isDisposed: boolean = false
   private _isThemeChanging: boolean = false
 
   // 初始化 Promise 相关
@@ -53,7 +61,7 @@ export class MarkdownPreviewPanel {
   private _initializationResolve: (() => void) | undefined
 
   // 防抖更新内容方法
-  private _debouncedUpdateContent: ((_document: vscode.TextDocument) => void) | undefined
+  private _debouncedUpdateContent: DebouncedFunction<(_document: vscode.TextDocument) => void> | undefined
 
   public static async createOrShowSlide(extensionUri: vscode.Uri, document?: vscode.TextDocument): Promise<MarkdownPreviewPanel> {
     return MarkdownPreviewPanel._createOrShow(extensionUri, vscode.ViewColumn.Beside, document)
@@ -108,10 +116,13 @@ export class MarkdownPreviewPanel {
 
     // 初始化防抖更新方法（300ms 延迟）
     this._debouncedUpdateContent = debounce(300, (document: vscode.TextDocument) => {
-      this.updateContent(document)
+      this.updateContent(document).catch(error =>
+        ErrorHandler.logError('防抖内容更新失败', error, 'MarkdownPreviewPanel'),
+      )
     })
 
     // 初始化服务
+    this._configService = new ConfigService()
     this._themeService = new ThemeService()
     this._markdownRenderer = new MarkdownRenderer(this._themeService)
     this._stateManager = new StateManager(panel)
@@ -370,6 +381,10 @@ export class MarkdownPreviewPanel {
       case 'openRelativeFile':
         this.handleRelativeFileClick(message.filePath)
         break
+
+      case 'webviewReady':
+        this._isWebviewReady = true
+        break
     }
   }
 
@@ -422,22 +437,33 @@ export class MarkdownPreviewPanel {
   /**
    * Update content with a new document - 重构版本
    */
-  public async updateContent(document: vscode.TextDocument): Promise<void> {
+  public async updateContent(document: vscode.TextDocument, options: { forceFullReload?: boolean } = {}): Promise<void> {
     if (!this._isInitialized) {
       ErrorHandler.logWarning('预览面板尚未初始化', 'MarkdownPreviewPanel')
       return
     }
+    if (this._isDisposed) {
+      return
+    }
 
     this._currentDocument = document
+    const renderGeneration = ++this._renderGeneration
 
     try {
       // 检查是否需要重新渲染
-      if (!this.shouldRerender(document)) {
+      if (!options.forceFullReload && !this.shouldRerender(document)) {
         return
       }
 
       // 渲染内容
-      await this.renderContent(document)
+      await this.renderContent(document, {
+        forceFullReload: options.forceFullReload,
+        renderGeneration,
+      })
+
+      if (this.isRenderStale(document, renderGeneration)) {
+        return
+      }
 
       // 更新状态
       this.updateRenderedState(document)
@@ -451,10 +477,11 @@ export class MarkdownPreviewPanel {
    * 检查是否需要重新渲染
    */
   private shouldRerender(document: vscode.TextDocument): boolean {
-    const content = document.getText()
     const currentTheme = this._themeService.currentTheme
+    const documentUri = document.uri.toString()
 
-    return this._lastRenderedContent !== content
+    return !this._hasRenderedWebview
+      || this._lastRenderedDocumentUri !== documentUri
       || this._lastRenderedDocumentVersion !== document.version
       || this._lastRenderedTheme !== currentTheme
   }
@@ -462,8 +489,12 @@ export class MarkdownPreviewPanel {
   /**
    * 渲染内容到面板
    */
-  private async renderContent(document: vscode.TextDocument): Promise<void> {
+  private async renderContent(
+    document: vscode.TextDocument,
+    options: { forceFullReload?: boolean, renderGeneration?: number } = {},
+  ): Promise<void> {
     const content = document.getText()
+    const themeBeforeRender = this._themeService.currentTheme
 
     // 获取 front matter 数据
     const frontMatterData = this._markdownRenderer.getFrontMatterData(content)
@@ -476,16 +507,24 @@ export class MarkdownPreviewPanel {
     const themeCSSVariables = await this._themeService.getThemeCSSVariables()
 
     // 获取文档宽度配置
-    const { ConfigService } = await import('../config')
-    const configService = new ConfigService()
-    const documentWidth = configService.getDocumentWidth()
-    const fontFamily = configService.getFontFamily()
+    const documentWidth = this._configService.getDocumentWidth()
+    const fontFamily = this._configService.getFontFamily()
 
     // 确保在渲染前获取最新的主题类型
     const currentThemeType = await this._themeService.refreshCurrentThemeType()
 
-    // 生成并设置HTML内容
-    this._panel.webview.html = HTMLTemplateService.generateHTML({
+    if (options.renderGeneration !== undefined && this.isRenderStale(document, options.renderGeneration)) {
+      return
+    }
+
+    const themeChanged = this._lastRenderedTheme !== undefined && this._lastRenderedTheme !== themeBeforeRender
+    const needsFullReload = options.forceFullReload
+      || !this._hasRenderedWebview
+      || !this._isWebviewReady
+      || this._lastRenderUsedKatex !== enableKatex
+      || themeChanged
+
+    const htmlOptions = {
       webview: this._panel.webview,
       extensionUri: this._extensionUri,
       content: renderedContent,
@@ -498,10 +537,39 @@ export class MarkdownPreviewPanel {
       enableScrollSyncDebug: this.getScrollSyncDebugSetting(), // 传递滚动同步排查日志设置
       enableKatex, // 传递 KaTeX 启用状态
       expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
-    })
+    }
+
+    if (needsFullReload) {
+      this._isWebviewReady = false
+      this._panel.webview.html = HTMLTemplateService.generateHTML(htmlOptions)
+      this._hasRenderedWebview = true
+    }
+    else {
+      const posted = await this._panel.webview.postMessage({
+        command: 'updateContent',
+        content: renderedContent,
+        frontMatterData,
+        markdownThemeType: currentThemeType,
+        expandTocByDefault: this.getTocExpandSetting(),
+      })
+
+      if (!posted) {
+        this._isWebviewReady = false
+        this._panel.webview.html = HTMLTemplateService.generateHTML(htmlOptions)
+        this._hasRenderedWebview = true
+      }
+    }
+
+    this._lastRenderUsedKatex = enableKatex
 
     // 更新面板标题 - 优先使用 front matter 中的 title
     this.updatePanelTitle(document, frontMatterData)
+  }
+
+  private isRenderStale(document: vscode.TextDocument, renderGeneration: number): boolean {
+    return this._isDisposed
+      || renderGeneration !== this._renderGeneration
+      || document !== this._currentDocument
   }
 
   /**
@@ -517,14 +585,13 @@ export class MarkdownPreviewPanel {
    * 更新渲染状态
    */
   private updateRenderedState(document: vscode.TextDocument): void {
-    const content = document.getText()
     const currentTheme = this._themeService.currentTheme
 
     // 保存状态
     this._stateManager.saveState(document, currentTheme)
 
     // 更新渲染缓存状态
-    this._lastRenderedContent = content
+    this._lastRenderedDocumentUri = document.uri.toString()
     this._lastRenderedDocumentVersion = document.version
     this._lastRenderedTheme = currentTheme
   }
@@ -549,9 +616,8 @@ export class MarkdownPreviewPanel {
     const themeCSSVariables = await this._themeService.getThemeCSSVariables()
 
     // 获取文档宽度配置
-    const { ConfigService } = await import('../config')
-    const configService = new ConfigService()
-    const documentWidth = configService.getDocumentWidth()
+    const documentWidth = this._configService.getDocumentWidth()
+    const fontFamily = this._configService.getFontFamily()
 
     this._panel.webview.html = HTMLTemplateService.generateHTML({
       webview: this._panel.webview,
@@ -560,10 +626,14 @@ export class MarkdownPreviewPanel {
       themeCSSVariables,
       markdownThemeType: this._themeService.getCurrentThemeType(), // 传递主题类型
       documentWidth, // 传递文档宽度
+      fontFamily, // 传递字体设置
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
       enableScrollSyncDebug: this.getScrollSyncDebugSetting(), // 传递滚动同步排查日志设置
       expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     })
+    this._hasRenderedWebview = true
+    this._isWebviewReady = false
+    this._lastRenderUsedKatex = false
   }
 
   /**
@@ -574,9 +644,8 @@ export class MarkdownPreviewPanel {
     const themeCSSVariables = await this._themeService.getThemeCSSVariables()
 
     // 获取文档宽度配置
-    const { ConfigService } = await import('../config')
-    const configService = new ConfigService()
-    const documentWidth = configService.getDocumentWidth()
+    const documentWidth = this._configService.getDocumentWidth()
+    const fontFamily = this._configService.getFontFamily()
 
     this._panel.webview.html = HTMLTemplateService.generateHTML({
       webview: this._panel.webview,
@@ -585,10 +654,14 @@ export class MarkdownPreviewPanel {
       themeCSSVariables,
       markdownThemeType: this._themeService.getCurrentThemeType(), // 传递主题类型
       documentWidth, // 传递文档宽度
+      fontFamily, // 传递字体设置
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
       enableScrollSyncDebug: this.getScrollSyncDebugSetting(), // 传递滚动同步排查日志设置
       expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     })
+    this._hasRenderedWebview = true
+    this._isWebviewReady = false
+    this._lastRenderUsedKatex = false
   }
 
   /**
@@ -636,9 +709,7 @@ export class MarkdownPreviewPanel {
 
     try {
       // 获取新的文档宽度
-      const { ConfigService } = await import('../config')
-      const configService = new ConfigService()
-      const documentWidth = configService.getDocumentWidth()
+      const documentWidth = this._configService.getDocumentWidth()
 
       // 向webview发送文档宽度更新消息
       this._panel.webview.postMessage({
@@ -661,9 +732,7 @@ export class MarkdownPreviewPanel {
 
     try {
       // 获取新的字体设置
-      const { ConfigService } = await import('../config')
-      const configService = new ConfigService()
-      const fontFamily = configService.getFontFamily()
+      const fontFamily = this._configService.getFontFamily()
 
       // 向webview发送字体更新消息
       this._panel.webview.postMessage({
@@ -703,7 +772,15 @@ export class MarkdownPreviewPanel {
    * Dispose of the panel and services
    */
   public dispose(): void {
+    if (this._isDisposed) {
+      return
+    }
+    this._isDisposed = true
+    this._renderGeneration++
     MarkdownPreviewPanel.currentPanel = undefined
+
+    this._debouncedUpdateContent?.cancel()
+    this._debouncedUpdateContent = undefined
 
     // 停止定期状态保存
     this._stateManager.dispose()
@@ -718,7 +795,12 @@ export class MarkdownPreviewPanel {
     this._markdownRenderer.dispose()
 
     // 清理面板
-    this._panel.dispose()
+    try {
+      this._panel.dispose()
+    }
+    catch {
+      // 面板可能已经由 VS Code 释放
+    }
 
     // 清理可释放资源
     while (this._disposables.length) {

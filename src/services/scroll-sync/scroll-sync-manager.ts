@@ -52,7 +52,7 @@ export class ScrollSyncManager {
    * 开始滚动同步
    */
   public start(): void {
-    console.log('[ScrollSyncManager] 初始化滚动同步管理器')
+    this.logConsole('[ScrollSyncManager] 初始化滚动同步管理器')
     this.setupMessageListener()
     this.setupEditorListener()
     this.logDebug('manager-start', {
@@ -60,7 +60,7 @@ export class ScrollSyncManager {
       visibleEditors: vscode.window.visibleTextEditors.length,
       editor: this.getEditorSnapshot(this.getCurrentEditor()),
     })
-    console.log('[ScrollSyncManager] 滚动同步管理器已启动，当前状态:', {
+    this.logConsole('[ScrollSyncManager] 滚动同步管理器已启动，当前状态:', {
       isEnabled: this._isEnabled,
       currentLine: this._currentLine,
     })
@@ -70,7 +70,7 @@ export class ScrollSyncManager {
    * 启用滚动同步
    */
   public enable(): void {
-    console.log('[ScrollSyncManager] 启用滚动同步')
+    this.logConsole('[ScrollSyncManager] 启用滚动同步')
     this._isEnabled = true
     this.logDebug('manager-enabled')
   }
@@ -79,7 +79,7 @@ export class ScrollSyncManager {
    * 禁用滚动同步
    */
   public disable(): void {
-    console.log('[ScrollSyncManager] 禁用滚动同步')
+    this.logConsole('[ScrollSyncManager] 禁用滚动同步')
     this._isEnabled = false
     // 清理当前状态
     this._isSyncing = false
@@ -109,6 +109,18 @@ export class ScrollSyncManager {
   private isDebugEnabled(): boolean {
     const config = vscode.workspace.getConfiguration('shikiMarkdownPreview')
     return config.get<boolean>('enableScrollSyncDebug', false)
+  }
+
+  private logConsole(...args: unknown[]): void {
+    if (this.isDebugEnabled()) {
+      console.warn(...args)
+    }
+  }
+
+  private warnConsole(...args: unknown[]): void {
+    if (this.isDebugEnabled()) {
+      console.warn(...args)
+    }
   }
 
   private getDebugOutputChannel(): vscode.OutputChannel {
@@ -270,7 +282,7 @@ export class ScrollSyncManager {
     })
 
     if (!this._isEnabled) {
-      console.log(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 滚动同步未启用`)
+      this.logConsole(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 滚动同步未启用`)
       this.logDebug('editor-scroll-ignored', {
         reason: 'sync-disabled',
         editor: editorSnapshot,
@@ -278,7 +290,7 @@ export class ScrollSyncManager {
       return
     }
     if (editor.document !== this._panel.currentDocument) {
-      console.log(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 文档不匹配`)
+      this.logConsole(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 文档不匹配`)
       this.logDebug('editor-scroll-ignored', {
         reason: 'document-mismatch',
         editor: editorSnapshot,
@@ -296,7 +308,7 @@ export class ScrollSyncManager {
       if (this._pendingPreviewTargetLine !== null) {
         this._currentLine = this._pendingPreviewTargetLine
       }
-      console.log(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 预览同步后的延迟回声`)
+      this.logConsole(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 预览同步后的延迟回声`)
       this.logDebug('editor-scroll-ignored', {
         reason: 'preview-echo-window',
         topLine,
@@ -308,7 +320,7 @@ export class ScrollSyncManager {
     }
     // 如果是预览触发的同步，忽略编辑器滚动
     if (this._isSyncing && this._syncSource === 'preview') {
-      console.log(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 正在同步中 (source=preview)`)
+      this.logConsole(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 正在同步中 (source=preview)`)
       this.logDebug('editor-scroll-ignored', {
         reason: 'lock-from-preview',
         editor: editorSnapshot,
@@ -317,7 +329,7 @@ export class ScrollSyncManager {
       return
     }
 
-    console.log(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动: 行 ${this._currentLine} → ${topLine}, 同步状态: isSyncing=${this._isSyncing}, source=${this._syncSource}`)
+    this.logConsole(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动: 行 ${this._currentLine} → ${topLine}, 同步状态: isSyncing=${this._isSyncing}, source=${this._syncSource}`)
     this.logDebug('editor-scroll-accepted', {
       fromLine: this._currentLine,
       toLine: topLine,
@@ -328,7 +340,7 @@ export class ScrollSyncManager {
 
     // 如果行号没有变化，跳过同步
     if (topLine === this._currentLine) {
-      console.log(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 行号未变化`)
+      this.logConsole(`[ScrollSyncManager#${this._debugCounter}] 编辑器滚动被忽略: 行号未变化`)
       this.logDebug('editor-scroll-ignored', {
         reason: 'line-unchanged',
         topLine,
@@ -416,17 +428,17 @@ export class ScrollSyncManager {
    * 监听来自 webview 的滚动消息
    */
   private setupMessageListener(): void {
-    console.log('[ScrollSyncManager] 设置消息监听器')
+    this.logConsole('[ScrollSyncManager] 设置消息监听器')
     this._disposables.push(
       this._panel.panel.webview.onDidReceiveMessage((message) => {
-        console.log(`[ScrollSyncManager] 收到 webview 消息:`, message)
+        this.logConsole(`[ScrollSyncManager] 收到 webview 消息:`, message)
         if (message.command === 'scrollSyncDebugLog') {
           this.logWebviewDebug(message.payload ?? {})
           return
         }
 
         if (message.command === 'previewScrolledToLine') {
-          console.log(`[ScrollSyncManager] 处理预览滚动消息: 行号=${message.line}`)
+          this.logConsole(`[ScrollSyncManager] 处理预览滚动消息: 行号=${message.line}`)
           this.syncToEditor(message.line)
         }
       }),
@@ -438,7 +450,7 @@ export class ScrollSyncManager {
    * 发送行号到 webview，让 Intersection Observer 处理滚动
    */
   private syncToPreview(line: number): void {
-    console.log(`[ScrollSyncManager] 同步到预览: 行号=${line}, 当前状态: isSyncing=${this._isSyncing}, source=${this._syncSource}`)
+    this.logConsole(`[ScrollSyncManager] 同步到预览: 行号=${line}, 当前状态: isSyncing=${this._isSyncing}, source=${this._syncSource}`)
     this.logDebug('sync-to-preview-start', {
       line,
       editor: this.getEditorSnapshot(this.getCurrentEditor()),
@@ -453,7 +465,7 @@ export class ScrollSyncManager {
       command: 'syncScrollToLine',
       line,
     })
-    console.log(`[ScrollSyncManager] 发送同步消息到预览: 行号=${line}, 发送结果=${success}`)
+    this.logConsole(`[ScrollSyncManager] 发送同步消息到预览: 行号=${line}, 发送结果=${success}`)
     this._lastPreviewSyncedLine = line
     this._lastPreviewSyncSentAt = Date.now()
     this.logDebug('sync-to-preview-message-sent', {
@@ -464,7 +476,7 @@ export class ScrollSyncManager {
     // 设置状态释放定时器
     this.clearSyncTimeout()
     this._syncTimeout = setTimeout(() => {
-      console.log(`[ScrollSyncManager] 同步状态释放: ${this._SYNC_BLOCK_MS}ms 后释放编辑器锁`)
+      this.logConsole(`[ScrollSyncManager] 同步状态释放: ${this._SYNC_BLOCK_MS}ms 后释放编辑器锁`)
       this.logDebug('sync-lock-release', {
         releasedSource: 'editor',
         delay: this._SYNC_BLOCK_MS,
@@ -481,7 +493,7 @@ export class ScrollSyncManager {
    */
   private async syncToEditor(line: number): Promise<void> {
     const startTime = Date.now()
-    console.log(`[ScrollSyncManager] 同步到编辑器: 请求行号=${line}, 当前状态: isSyncing=${this._isSyncing}, source=${this._syncSource}, currentLine=${this._currentLine}`)
+    this.logConsole(`[ScrollSyncManager] 同步到编辑器: 请求行号=${line}, 当前状态: isSyncing=${this._isSyncing}, source=${this._syncSource}, currentLine=${this._currentLine}`)
     this.logDebug('sync-to-editor-request', {
       requestedLine: line,
       editorBeforeLookup: this.getEditorSnapshot(this.getCurrentEditor()),
@@ -491,7 +503,7 @@ export class ScrollSyncManager {
 
     // 如果是编辑器触发的同步，忽略
     if (this._isSyncing && this._syncSource === 'editor') {
-      console.log(`[ScrollSyncManager] 同步到编辑器被忽略: 正在同步中 (source=editor)`)
+      this.logConsole(`[ScrollSyncManager] 同步到编辑器被忽略: 正在同步中 (source=editor)`)
       this.logDebug('sync-to-editor-ignored', {
         reason: 'lock-from-editor',
         requestedLine: line,
@@ -508,7 +520,7 @@ export class ScrollSyncManager {
     const editor = this.getCurrentEditor()
 
     if (!editor) {
-      console.warn('[ScrollSyncManager] 未找到编辑器，取消同步')
+      this.warnConsole('[ScrollSyncManager] 未找到编辑器，取消同步')
       this.logDebug('sync-to-editor-ignored', {
         reason: 'editor-not-found',
         requestedLine: line,
@@ -519,11 +531,11 @@ export class ScrollSyncManager {
     }
 
     const lineCount = editor.document.lineCount
-    console.log(`[ScrollSyncManager] 编辑器总行数: ${lineCount}`)
+    this.logConsole(`[ScrollSyncManager] 编辑器总行数: ${lineCount}`)
 
     // 确保行号在有效范围内
     const targetLine = Math.max(0, Math.min(line, lineCount - 1))
-    console.log(`[ScrollSyncManager] 目标行号: ${targetLine}`)
+    this.logConsole(`[ScrollSyncManager] 目标行号: ${targetLine}`)
     const beforeReveal = this.getEditorSnapshot(editor)
     this._pendingPreviewTargetLine = targetLine
     this._ignoreEditorScrollUntil = Date.now() + this._PREVIEW_TO_EDITOR_ECHO_BLOCK_MS
@@ -552,7 +564,7 @@ export class ScrollSyncManager {
       this._currentLine = targetLine
       this._lastPreviewSyncedLine = targetLine
       const elapsed = Date.now() - startTime
-      console.log(`[ScrollSyncManager] 编辑器滚动完成: 行 ${targetLine}, 耗时 ${elapsed}ms`)
+      this.logConsole(`[ScrollSyncManager] 编辑器滚动完成: 行 ${targetLine}, 耗时 ${elapsed}ms`)
       this.logDebug('editor-reveal-range-called', {
         requestedLine: line,
         targetLine,
@@ -574,7 +586,7 @@ export class ScrollSyncManager {
     // 设置状态释放定时器
     this.clearSyncTimeout()
     this._syncTimeout = setTimeout(() => {
-      console.log(`[ScrollSyncManager] 同步状态释放: ${this._SYNC_BLOCK_MS}ms 后释放预览锁`)
+      this.logConsole(`[ScrollSyncManager] 同步状态释放: ${this._SYNC_BLOCK_MS}ms 后释放预览锁`)
       this.logDebug('sync-lock-release', {
         releasedSource: 'preview',
         delay: this._SYNC_BLOCK_MS,
@@ -591,7 +603,7 @@ export class ScrollSyncManager {
    * 停止滚动同步并清理资源
    */
   public dispose(): void {
-    console.log('[ScrollSyncManager] 清理资源，停止滚动同步')
+    this.logConsole('[ScrollSyncManager] 清理资源，停止滚动同步')
     this.logDebug('manager-dispose')
     // 1. 清理所有定时器
     this.clearSyncTimeout()
@@ -602,7 +614,7 @@ export class ScrollSyncManager {
         d.dispose()
       }
       catch (error) {
-        console.warn('清理监听器时出错:', error)
+        this.warnConsole('清理监听器时出错:', error)
       }
     })
     this._disposables = []

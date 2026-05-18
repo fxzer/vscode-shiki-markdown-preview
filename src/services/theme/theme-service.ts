@@ -42,13 +42,19 @@ export class ThemeService {
 
       // 只预加载当前主题和常用语言
       const currentTheme = this._configService.getCurrentTheme()
+      this._currentTheme = currentTheme
 
-      this._highlighter = await createHighlighter({
+      const highlighter = await createHighlighter({
         themes: [currentTheme],
         langs: this._commonLanguages,
       })
 
+      this.disposeCurrentHighlighter()
+      this._highlighter = highlighter
+
       // 记录已加载的主题和语言
+      this._loadedThemes.clear()
+      this._loadedLanguages.clear()
       this._loadedThemes.add(currentTheme)
       this._commonLanguages.forEach(lang => this._loadedLanguages.add(lang))
 
@@ -640,6 +646,7 @@ export class ThemeService {
       })
 
       // 替换当前高亮器，确保主题和语言都得到保留
+      this.disposeCurrentHighlighter()
       this._highlighter = newHighlighter
 
       // 更新已加载主题集合
@@ -671,6 +678,7 @@ export class ThemeService {
       })
 
       // 替换当前高亮器
+      this.disposeCurrentHighlighter()
       this._highlighter = newHighlighter
     }
     catch (error) {
@@ -757,6 +765,7 @@ export class ThemeService {
           })
 
           // 替换当前高亮器
+          this.disposeCurrentHighlighter()
           this._highlighter = newHighlighter
           this._loadedLanguages.add(mappedLanguage)
         }
@@ -923,7 +932,24 @@ export class ThemeService {
     }
   }
 
+  private disposeCurrentHighlighter(): void {
+    const highlighter = this._highlighter as (Highlighter & { dispose?: () => void }) | undefined
+    try {
+      highlighter?.dispose?.()
+    }
+    catch (error) {
+      ErrorHandler.logWarning(`语法高亮器释放失败: ${error instanceof Error ? error.message : String(error)}`, 'ThemeService')
+    }
+    this._highlighter = undefined
+  }
+
   dispose(): void {
+    this.disposeCurrentHighlighter()
+    this._loadedThemes.clear()
+    this._loadedLanguages.clear()
+    this._themeCache.metadata.clear()
+    this._themeCache.grouped = { light: [], dark: [], all: [] }
+    this._themeCache.loaded = false
     this._highlighter = undefined
   }
 }
