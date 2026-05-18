@@ -46,7 +46,10 @@ export function activate(context: vscode.ExtensionContext) {
       if (MarkdownPreviewPanel.currentPanel) {
         // 如果预览面板存在，直接显示主题选择器
         await ErrorHandler.safeExecute(
-          () => showThemePicker(MarkdownPreviewPanel.currentPanel!, configService.getCurrentTheme()),
+          () => showThemePicker(
+            MarkdownPreviewPanel.currentPanel!,
+            MarkdownPreviewPanel.currentPanel!.themeService.currentTheme,
+          ),
           '主题选择器打开失败',
           'Extension',
         )
@@ -63,7 +66,10 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (MarkdownPreviewPanel.currentPanel) {
         await ErrorHandler.safeExecute(
-          () => showThemePicker(MarkdownPreviewPanel.currentPanel!, configService.getCurrentTheme()),
+          () => showThemePicker(
+            MarkdownPreviewPanel.currentPanel!,
+            MarkdownPreviewPanel.currentPanel!.themeService.currentTheme,
+          ),
           '主题选择器打开失败',
           'Extension',
         )
@@ -104,42 +110,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      // 检查是否是我们扩展的配置发生了变化
-      if (event.affectsConfiguration('shikiMarkdownPreview.currentTheme')) {
-        if (MarkdownPreviewPanel.currentPanel) {
-          // 使用配置服务获取新的主题设置
-          const newTheme = configService.getCurrentTheme()
-          const currentTheme = MarkdownPreviewPanel.currentPanel.themeService.currentTheme
-
-          // 如果主题没有实际变化，跳过更新
-          if (newTheme === currentTheme) {
-            return
-          }
-
-          // 实时更新预览主题
-          const themeService = MarkdownPreviewPanel.currentPanel.themeService
-          const success = await ErrorHandler.safeExecute(
-            () => themeService.updateThemeForPreview(newTheme),
-            `主题预览更新失败: ${newTheme}`,
-            'Extension',
-          )
-
-          if (success) {
-            const currentDocument = MarkdownPreviewPanel.currentPanel.currentDocument
-            if (currentDocument) {
-              ErrorHandler.safeExecuteSync(
-                () => MarkdownPreviewPanel.currentPanel!.updateContentDebounced(currentDocument),
-                '主题更新后内容刷新失败',
-                'Extension',
-              )
-            }
-          }
-
-          // 显示通知
-          ErrorHandler.showInfo(`主题已更改为: ${newTheme}`)
-        }
-      }
-
       // 检查滚动同步设置是否发生变化
       if (event.affectsConfiguration('shikiMarkdownPreview.enableScrollSync')) {
         if (MarkdownPreviewPanel.currentPanel) {

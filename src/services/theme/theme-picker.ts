@@ -109,7 +109,9 @@ export async function showThemePicker(panel: MarkdownPreviewPanel, currentThemeV
   // 创建 QuickPick 实例以获得更多控制
   const quickPick = vscode.window.createQuickPick<ThemeQuickPickItem>()
   quickPick.title = '选择 Markdown 预览主题'
-  quickPick.placeholder = `使用方向键预览主题，按回车确认选择（共 ${count} 个主题）`
+  quickPick.placeholder = themeService.autoDetectColorSchemeEnabled
+    ? `自动跟随已开启，按回车保存为当前亮/暗外观偏好主题（共 ${count} 个主题）`
+    : `使用方向键预览主题，按回车确认选择（共 ${count} 个主题）`
   quickPick.items = options
   quickPick.canSelectMany = false
   quickPick.matchOnDescription = true
@@ -226,8 +228,8 @@ export async function showThemePicker(panel: MarkdownPreviewPanel, currentThemeV
     if (selectedItem?.theme) {
       await ErrorHandler.safeExecute(
         async () => {
-          // 使用配置服务更新主题
-          await themeService.updateTheme(selectedItem.theme, vscode.ConfigurationTarget.Global)
+          // 根据当前模式保存主题：手动模式写 currentTheme，自动模式写当前亮/暗偏好主题
+          await themeService.updateSelectedTheme(selectedItem.theme, vscode.ConfigurationTarget.Global)
         },
         '主题切换失败',
         'ThemePicker',

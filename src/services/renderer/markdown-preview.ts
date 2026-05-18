@@ -192,6 +192,16 @@ export class MarkdownPreviewPanel {
   }
 
   /**
+   * 判断是否是会影响预览主题的配置变化
+   */
+  private isThemeConfigurationChange(event: vscode.ConfigurationChangeEvent): boolean {
+    return event.affectsConfiguration('shikiMarkdownPreview.currentTheme')
+      || event.affectsConfiguration('shikiMarkdownPreview.autoDetectColorScheme')
+      || event.affectsConfiguration('shikiMarkdownPreview.preferredDarkColorTheme')
+      || event.affectsConfiguration('shikiMarkdownPreview.preferredLightColorTheme')
+  }
+
+  /**
    * Set up panel configuration
    */
   private setupPanel(): void {
@@ -228,17 +238,18 @@ export class MarkdownPreviewPanel {
     // 监听配置变化，特别是主题变化
     vscode.workspace.onDidChangeConfiguration(
       (event) => {
-        if (event.affectsConfiguration('shikiMarkdownPreview.currentTheme')) {
+        if (this.isThemeConfigurationChange(event)) {
           // 如果正在手动切换主题，跳过配置变化处理
           if (this._isThemeChanging) {
             ErrorHandler.logInfo('主题正在手动切换中，跳过配置变化处理', 'MarkdownPreviewPanel')
-            return
           }
-          ErrorHandler.safeExecute(
-            () => this.handleThemeChange(),
-            '主题变化处理失败',
-            'MarkdownPreviewPanel',
-          )
+          else {
+            ErrorHandler.safeExecute(
+              () => this.handleThemeChange(),
+              '主题变化处理失败',
+              'MarkdownPreviewPanel',
+            )
+          }
         }
         if (event.affectsConfiguration('shikiMarkdownPreview.documentWidth')) {
           ErrorHandler.safeExecute(
@@ -254,13 +265,23 @@ export class MarkdownPreviewPanel {
             'MarkdownPreviewPanel',
           )
         }
-        if (event.affectsConfiguration('shikiMarkdownPreview.currentTheme')) {
-          ErrorHandler.safeExecute(
-            () => this.handleThemeTypeChange(),
-            '主题类型变化处理失败',
-            'MarkdownPreviewPanel',
-          )
+      },
+      null,
+      this._disposables,
+    )
+
+    // 自动跟随开启后，VS Code 外观发生亮/暗变化时刷新预览主题
+    vscode.window.onDidChangeActiveColorTheme(
+      () => {
+        if (!this._themeService.autoDetectColorSchemeEnabled) {
+          return
         }
+
+        ErrorHandler.safeExecute(
+          () => this.handleThemeChange(),
+          '系统外观变化处理失败',
+          'MarkdownPreviewPanel',
+        )
       },
       null,
       this._disposables,
@@ -678,8 +699,16 @@ export class MarkdownPreviewPanel {
     }
 
     try {
-      // 重新初始化主题服务以获取新主题
-      await this._themeService.initializeHighlighter()
+      const nextTheme = this._themeService.effectiveTheme
+      if (nextTheme === this._themeService.currentTheme) {
+        return
+      }
+
+      const applied = await this._themeService.applyEffectiveTheme()
+      if (!applied) {
+        ErrorHandler.logWarning(`主题变化处理：无法应用主题 ${nextTheme}`, 'MarkdownPreviewPanel')
+        return
+      }
 
       // 重新加载文档中使用的所有语言
       if (this._currentDocument) {
@@ -688,7 +717,7 @@ export class MarkdownPreviewPanel {
 
       // 更新内容以应用新主题
       if (this._currentDocument) {
-        this.updateContentDebounced(this._currentDocument)
+        await this.updateContent(this._currentDocument, { forceFullReload: true })
       }
       else {
         await this.renderEmptyPanel()
@@ -742,29 +771,6 @@ export class MarkdownPreviewPanel {
     }
     catch (error) {
       ErrorHandler.logError('字体变化处理失败', error, 'MarkdownPreviewPanel')
-    }
-  }
-
-  /**
-   * Handle theme type change
-   */
-  private async handleThemeTypeChange(): Promise<void> {
-    if (!this._isInitialized) {
-      return
-    }
-
-    try {
-      // 获取当前主题类型
-      const currentThemeType = await this._themeService.refreshCurrentThemeType()
-
-      // 向webview发送主题类型更新消息
-      this._panel.webview.postMessage({
-        command: 'updateTheme',
-        themeType: currentThemeType,
-      })
-    }
-    catch (error) {
-      ErrorHandler.logError('主题类型变化处理失败', error, 'MarkdownPreviewPanel')
     }
   }
 

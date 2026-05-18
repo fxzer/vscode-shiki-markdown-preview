@@ -35,17 +35,6 @@ export class MarkdownPreviewSerializer implements vscode.WebviewPanelSerializer 
       if (MarkdownPreviewPanel.currentPanel) {
         await MarkdownPreviewPanel.currentPanel.updateContent(documentToRestore)
 
-        // 恢复主题（如果状态中有保存）
-        if (_state?.theme && MarkdownPreviewPanel.currentPanel) {
-          const themeService = MarkdownPreviewPanel.currentPanel.themeService
-          if (await themeService.updateThemeForPreview(_state.theme)) {
-            const currentDocument = MarkdownPreviewPanel.currentPanel.currentDocument
-            if (currentDocument) {
-              await MarkdownPreviewPanel.currentPanel.updateContent(currentDocument)
-            }
-          }
-        }
-
         // 滚动同步逻辑已移除
 
         // 聚焦到文档

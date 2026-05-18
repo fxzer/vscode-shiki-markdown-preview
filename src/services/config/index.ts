@@ -15,6 +15,71 @@ export class ConfigService {
   }
 
   /**
+   * 是否跟随 VS Code 当前亮色/暗色外观切换主题
+   */
+  public getAutoDetectColorSchemeEnabled(): boolean {
+    const config = vscode.workspace.getConfiguration(ConfigService.SECTION)
+    return config.get<boolean>('autoDetectColorScheme', false)
+  }
+
+  /**
+   * 获取暗色外观下偏好的预览主题
+   */
+  public getPreferredDarkColorTheme(): string {
+    const config = vscode.workspace.getConfiguration(ConfigService.SECTION)
+    return config.get('preferredDarkColorTheme', 'vitesse-dark')
+  }
+
+  /**
+   * 获取亮色外观下偏好的预览主题
+   */
+  public getPreferredLightColorTheme(): string {
+    const config = vscode.workspace.getConfiguration(ConfigService.SECTION)
+    return config.get('preferredLightColorTheme', 'vitesse-light')
+  }
+
+  /**
+   * 获取 VS Code 当前外观是亮色还是暗色
+   */
+  public getActiveColorScheme(): 'light' | 'dark' {
+    switch (vscode.window.activeColorTheme.kind) {
+      case vscode.ColorThemeKind.Light:
+      case vscode.ColorThemeKind.HighContrastLight:
+        return 'light'
+      case vscode.ColorThemeKind.Dark:
+      case vscode.ColorThemeKind.HighContrast:
+      default:
+        return 'dark'
+    }
+  }
+
+  /**
+   * 获取当前真正应该生效的预览主题
+   */
+  public getEffectiveTheme(): string {
+    if (!this.getAutoDetectColorSchemeEnabled()) {
+      return this.getCurrentTheme()
+    }
+
+    return this.getActiveColorScheme() === 'dark'
+      ? this.getPreferredDarkColorTheme()
+      : this.getPreferredLightColorTheme()
+  }
+
+  /**
+   * 主题选择器确认后应该写入哪个配置项
+   */
+  public getThemeSelectionConfigKey(): 'currentTheme' | 'preferredDarkColorTheme' | 'preferredLightColorTheme' {
+    if (!this.getAutoDetectColorSchemeEnabled()) {
+      return 'currentTheme'
+    }
+
+    return this.getActiveColorScheme() === 'dark'
+      ? 'preferredDarkColorTheme'
+      : 'preferredLightColorTheme'
+  }
+
+  /**
    * 获取文档宽度
    */
   public getDocumentWidth(): string {

@@ -27,7 +27,7 @@ export class ThemeService {
 
   constructor() {
     this._configService = new ConfigService() // 初始化配置服务
-    this._currentTheme = this._configService.getCurrentTheme() // 使用配置服务获取当前主题
+    this._currentTheme = this._configService.getEffectiveTheme() // 使用配置服务获取实际生效主题
   }
 
   /**
@@ -40,8 +40,8 @@ export class ThemeService {
         await this.discoverAndCacheThemes()
       }
 
-      // 只预加载当前主题和常用语言
-      const currentTheme = this._configService.getCurrentTheme()
+      // 只预加载实际生效主题和常用语言
+      const currentTheme = this._configService.getEffectiveTheme()
       this._currentTheme = currentTheme
 
       const highlighter = await createHighlighter({
@@ -133,12 +133,6 @@ export class ThemeService {
       // 确保主题缓存是最新的
       if (!this._themeCache.loaded) {
         await this.discoverAndCacheThemes()
-      }
-
-      // 重新获取当前主题（从配置中）
-      const configTheme = this._configService.getCurrentTheme()
-      if (configTheme !== this._currentTheme) {
-        this._currentTheme = configTheme
       }
 
       return this.getCurrentThemeType()
@@ -297,6 +291,43 @@ export class ThemeService {
       `主题配置更新失败: ${themeName}`,
       'ThemeService',
     ) !== null
+  }
+
+  /**
+   * 根据当前模式保存主题选择：
+   * - 手动模式：保存到 currentTheme
+   * - 自动模式：保存到当前亮/暗外观对应的偏好主题
+   */
+  async updateSelectedTheme(themeName: string, target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global): Promise<boolean> {
+    return ErrorHandler.safeExecute(
+      async () => {
+        await this._configService.updateConfig(this._configService.getThemeSelectionConfigKey(), themeName, target)
+        return true
+      },
+      `主题配置更新失败: ${themeName}`,
+      'ThemeService',
+    ) !== null
+  }
+
+  /**
+   * 应用当前配置下真正应该生效的主题
+   */
+  async applyEffectiveTheme(): Promise<boolean> {
+    return this.updateThemeForPreview(this._configService.getEffectiveTheme())
+  }
+
+  /**
+   * 获取当前配置下真正应该生效的主题
+   */
+  get effectiveTheme(): string {
+    return this._configService.getEffectiveTheme()
+  }
+
+  /**
+   * 当前是否启用亮/暗外观自动跟随
+   */
+  get autoDetectColorSchemeEnabled(): boolean {
+    return this._configService.getAutoDetectColorSchemeEnabled()
   }
 
   /**
