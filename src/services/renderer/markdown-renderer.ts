@@ -52,7 +52,7 @@ export class MarkdownRenderer {
     this._markdownIt.use(markdownItSub)
     this._markdownIt.use(markdownItSup)
     const markdownItCheckboxPlugin = (markdownItCheckbox as any).default ?? markdownItCheckbox
-    this._markdownIt.use(markdownItCheckboxPlugin)
+    this._markdownIt.use(markdownItCheckboxPlugin, { disabled: false })
 
     this.setupContainerPlugins()
     this.setupCustomRules()
@@ -481,6 +481,7 @@ export class MarkdownRenderer {
     try {
       // 使用 gray-matter 分离 front matter 和内容
       const { content: markdownContent } = this.parseFrontMatter(content)
+      const sourceLineOffset = this.getSourceLineOffset(content, markdownContent)
 
       // 按需启用 KaTeX 数学公式支持
       this.enableKatexIfNeeded(markdownContent)
@@ -517,7 +518,7 @@ export class MarkdownRenderer {
           // 找到当前 token 对应的源代码行号
           const lineNumber = this.findSourceLineNumber(tokens, idx, lines, currentLine)
           if (lineNumber !== -1) {
-            token.attrSet?.('data-line', lineNumber.toString())
+            token.attrSet?.('data-line', (lineNumber + sourceLineOffset).toString())
             currentLine = lineNumber + 1
           }
         }
@@ -656,6 +657,22 @@ export class MarkdownRenderer {
 
     // 如果找不到匹配，返回当前位置
     return startLine
+  }
+
+  /**
+   * 计算渲染内容在原文件中的起始行，避免 front matter 存在时行号偏移。
+   */
+  private getSourceLineOffset(originalContent: string, renderedContent: string): number {
+    if (!renderedContent) {
+      return 0
+    }
+
+    const contentStart = originalContent.indexOf(renderedContent)
+    if (contentStart <= 0) {
+      return 0
+    }
+
+    return originalContent.slice(0, contentStart).split('\n').length - 1
   }
 
   /**

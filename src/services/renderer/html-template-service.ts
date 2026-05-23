@@ -44,6 +44,7 @@ export class HTMLTemplateService {
       'utils.js',
       'syntax-highlight.js',
       'link-handler.js',
+      'task-checkbox-handler.js',
       'mermaid.min.js',
       'mermaid-renderer.js',
       ...(enableScrollSync ? ['scroll-sync.js'] : []),

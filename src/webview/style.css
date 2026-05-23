@@ -462,6 +462,7 @@ dd {
 .task-list-item input[type='checkbox'] {
   margin-right: 0.5rem;
   vertical-align: middle;
+  cursor: pointer;
 }
 
 .task-list-item input[type='checkbox']:checked + * {

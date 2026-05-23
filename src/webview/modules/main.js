@@ -103,6 +103,17 @@ function handleExtensionMessage(event) {
           )
         }
 
+        // 重新初始化任务复选框处理
+        if (window.initializeTaskCheckboxHandling) {
+          window.robustInitialize(
+            () => document.getElementById('markdown-content'),
+            window.initializeTaskCheckboxHandling,
+            'Task checkbox reinitialization failed after content update.',
+            3,
+            50,
+          )
+        }
+
         // 重新初始化NotionToc
         if (window.NotionToc) {
           window.robustInitialize(
@@ -239,6 +250,15 @@ function initializeWebviewModules() {
       () => document.getElementById('markdown-content'),
       window.initializeLinkHandling,
       'Link handling initialization failed: Markdown content not found.',
+    )
+  }
+
+  // 检查任务复选框处理初始化条件
+  if (window.robustInitialize && window.initializeTaskCheckboxHandling) {
+    window.robustInitialize(
+      () => document.getElementById('markdown-content'),
+      window.initializeTaskCheckboxHandling,
+      'Task checkbox initialization failed: Markdown content not found.',
     )
   }
 

@@ -403,10 +403,53 @@ export class MarkdownPreviewPanel {
         this.handleRelativeFileClick(message.filePath)
         break
 
+      case 'toggleTaskCheckbox':
+        void this.handleTaskCheckboxToggle(message.line, message.checked)
+        break
+
       case 'webviewReady':
         this._isWebviewReady = true
         break
     }
+  }
+
+  private async handleTaskCheckboxToggle(line: number, checked: boolean): Promise<void> {
+    const currentDocument = this._currentDocument
+    if (!currentDocument || !Number.isInteger(line) || line < 0 || line >= currentDocument.lineCount) {
+      await this.refreshCurrentContent()
+      return
+    }
+
+    const sourceLine = currentDocument.lineAt(line)
+    const nextText = this.toggleTaskCheckboxMarker(sourceLine.text, checked)
+
+    if (nextText === sourceLine.text) {
+      await this.refreshCurrentContent()
+      return
+    }
+
+    const edit = new vscode.WorkspaceEdit()
+    edit.replace(currentDocument.uri, sourceLine.range, nextText)
+
+    const applied = await vscode.workspace.applyEdit(edit)
+    if (!applied) {
+      await this.refreshCurrentContent()
+    }
+  }
+
+  private toggleTaskCheckboxMarker(text: string, checked: boolean): string {
+    return text.replace(
+      /^(\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+)\[[ x\u00A0]\](?=[ \u00A0])/i,
+      `$1[${checked ? 'x' : ' '}]`,
+    )
+  }
+
+  private async refreshCurrentContent(): Promise<void> {
+    if (!this._currentDocument) {
+      return
+    }
+
+    await this.updateContent(this._currentDocument, { forceFullReload: true })
   }
 
   private async handleThemeSelection(theme: string): Promise<void> {
