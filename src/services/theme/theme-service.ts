@@ -356,45 +356,24 @@ export class ThemeService {
   }
 
   /**
-   * 主题切换后重新加载当前文档的语言
-   * 解决主题切换后代码块高亮失效的问题
+   * 主题切换后确保语言已加载
+   * 主题切换只改变颜色 token，不需要重新加载语言的语法规则。
+   * 对于首次遇到的新语言，只做按需加载，不强制重载已有语言。
    */
   async reloadLanguagesAfterThemeChange(content?: string): Promise<void> {
     try {
       if (content) {
-        // 如果有内容，重新预加载检测到的语言
+        // 只加载文档中用到的、尚未加载的语言
         const detectedLanguages = detectLanguages(content)
+        const unloadedLanguages = detectedLanguages.filter(lang => !this._loadedLanguages.has(lang))
 
-        // 先重新加载常用语言（强制重新加载）
-        for (const lang of this._commonLanguages) {
-          try {
-            await this.forceReloadLanguage(lang)
-          }
-          catch {
-            ErrorHandler.logWarning(`重新加载常用语言失败: ${lang}`, 'ThemeService')
-          }
-        }
-
-        // 然后加载检测到的语言（强制重新加载）
-        for (const lang of detectedLanguages) {
-          try {
-            await this.forceReloadLanguage(lang)
-          }
-          catch {
-            ErrorHandler.logWarning(`重新加载检测语言失败: ${lang}`, 'ThemeService')
-          }
-        }
-      }
-      else {
-        // 如果没有内容，重新加载常用语言
-        const commonLanguagesToReload = this._commonLanguages.filter(lang => !this._loadedLanguages.has(lang))
-        if (commonLanguagesToReload.length > 0) {
-          await this.preloadLanguages(commonLanguagesToReload)
+        if (unloadedLanguages.length > 0) {
+          await this.preloadLanguages(unloadedLanguages)
         }
       }
     }
     catch (error) {
-      ErrorHandler.logError('主题切换后语言重新加载失败', error, 'ThemeService')
+      ErrorHandler.logError('主题切换后语言加载失败', error, 'ThemeService')
     }
   }
 
