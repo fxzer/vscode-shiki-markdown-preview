@@ -589,6 +589,9 @@ export class MarkdownPreviewPanel {
       || this._lastRenderUsedKatex !== enableKatex
       || themeChanged
 
+    // 检测渲染内容中是否包含 Mermaid 图表，按需加载（500KB+ 的库）
+    const hasMermaid = renderedContent.includes('language-mermaid')
+
     const htmlOptions = {
       webview: this._panel.webview,
       extensionUri: this._extensionUri,
@@ -601,6 +604,7 @@ export class MarkdownPreviewPanel {
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
       enableScrollSyncDebug: this.getScrollSyncDebugSetting(), // 传递滚动同步排查日志设置
       enableKatex, // 传递 KaTeX 启用状态
+      enableMermaid: hasMermaid, // 按需加载 Mermaid（仅在文档包含 mermaid 图表时）
       expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     }
 
