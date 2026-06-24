@@ -1,5 +1,3 @@
-import MarkdownIt from 'markdown-it'
-
 export const SUPPORTED_LANGUAGES = [
   'abap',
   'actionscript-3',
@@ -224,8 +222,6 @@ export const SUPPORTED_LANGUAGES = [
   'zenscript',
   'zig',
 ]
-const md = new MarkdownIt()
-
 /**
  * 语言别名映射表
  * 将常见的语言简写映射到完整的语言名称
@@ -306,31 +302,33 @@ export function isSupportedLanguage(language: string): boolean {
 }
 /**
  * 从 Markdown 内容中检测所有使用的代码块语言
+ * 通过正则提取 fenced code block 的语言标识符，无需依赖 markdown-it 完整解析。
  * @param content Markdown 内容
  * @returns 检测到的语言列表（去重）
  */
 export function detectLanguages(content: string): string[] {
   try {
-    const tokens = md.parse(content, {})
     const languages = new Set<string>()
 
-    tokens.forEach((token) => {
-      if (token.type === 'fence' && token.info) {
-        // info 可能带参数，比如 "js {lineNumbers}" 或带行号范围如 "javascript{1,5,8-10}"
-        let lang = token.info.split(/\s+/)[0].trim()
+    // 匹配 ``` 和 ~~~ 两种 fenced code block 的起始行，提取语言标识符
+    // 格式: ```language 或 ~~~language，language 后面可能跟空格和参数
+    const fenceRegex = /^(?:`{3,}|~{3,})[ \t]*(\S+)/gm
+    let match: RegExpExecArray | null
 
-        // 处理带有行号范围的语言标识符，如 javascript{1,5,8-10}
-        const lineNumberMatch = lang.match(/^([^{]+)(?:\{.+\})?$/)
-        if (lineNumberMatch && lineNumberMatch[1]) {
-          lang = lineNumberMatch[1].trim()
-        }
-        if (lang) {
-          // 使用语言映射，将 shell 相关语言映射到 shellscript
-          const mappedLang = mapLanguageToShiki(lang)
-          languages.add(mappedLang)
-        }
+    while ((match = fenceRegex.exec(content)) !== null) {
+      let lang = match[1].trim()
+
+      // 处理带有行号范围的语言标识符，如 javascript{1,5,8-10}
+      const lineNumberMatch = lang.match(/^([^{]+)(?:\{.+\})?$/)
+      if (lineNumberMatch && lineNumberMatch[1]) {
+        lang = lineNumberMatch[1].trim()
       }
-    })
+      if (lang) {
+        // 使用语言映射，将 shell 相关语言映射到 shellscript
+        const mappedLang = mapLanguageToShiki(lang)
+        languages.add(mappedLang)
+      }
+    }
 
     return Array.from(languages).sort()
   }
