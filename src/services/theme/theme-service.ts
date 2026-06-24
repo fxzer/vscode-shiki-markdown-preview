@@ -63,13 +63,6 @@ export class ThemeService {
   }
 
   /**
-   * 验证主题是否可用
-   */
-  isValidThemeSync(theme: string): boolean {
-    return this._themeCache.loaded && this._themeCache.metadata.has(theme)
-  }
-
-  /**
    * 根据主题类型进行分组
    */
   groupThemesByType(themes: ThemeMetadata[]): GroupedThemes {
@@ -270,23 +263,6 @@ export class ThemeService {
       ErrorHandler.logError('主题配置更新失败', error, 'ThemeService')
       return false
     }
-  }
-
-  /**
-   * 更新主题配置
-   * @param themeName 主题名称
-   * @param target 配置目标
-   * @returns Promise<boolean> 是否成功更新
-   */
-  async updateTheme(themeName: string, target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global): Promise<boolean> {
-    return ErrorHandler.safeExecute(
-      async () => {
-        await this._configService.updateConfig('currentTheme', themeName, target)
-        return true
-      },
-      `主题配置更新失败: ${themeName}`,
-      'ThemeService',
-    ) !== null
   }
 
   /**
@@ -580,50 +556,6 @@ export class ThemeService {
   }
 
   /**
-   * 使用当前主题高亮代码（异步版本）
-   * 异步高亮代码，会动态加载所需的主题和语言
-   */
-  async highlightCodeAsync(code: string, language: string): Promise<string> {
-    if (!this._highlighter || !language) {
-      return escapeHtml(code)
-    }
-
-    try {
-      // 使用语言映射，将 shell 相关语言映射到 shellscript
-      const mappedLanguage = mapLanguageToShiki(language)
-
-      // 检查主题是否已加载
-      if (!this._loadedThemes.has(this._currentTheme)) {
-        await this.loadTheme(this._currentTheme)
-      }
-
-      // 检查语言是否已加载
-      if (!this._loadedLanguages.has(mappedLanguage)) {
-        await this.loadLanguage(mappedLanguage)
-      }
-
-      const highlighted = this._highlighter.codeToHtml(code, {
-        lang: mappedLanguage,
-        theme: this._currentTheme,
-      })
-
-      // 确保返回的是字符串类型
-      if (typeof highlighted === 'string') {
-        return highlighted
-      }
-      else {
-        ErrorHandler.logWarning(`高亮结果不是字符串: ${typeof highlighted}`, 'ThemeService')
-        return escapeHtml(code)
-      }
-    }
-    catch {
-      ErrorHandler.logWarning(`代码高亮失败: ${language}`, 'ThemeService')
-      // 如果失败，返回简单的HTML转义代码
-      return escapeHtml(code)
-    }
-  }
-
-  /**
    * 动态加载指定的主题
    */
   private async loadTheme(theme: string): Promise<void> {
@@ -665,72 +597,6 @@ export class ThemeService {
     catch (error) {
       ErrorHandler.logError(`主题加载失败: ${theme}`, error, 'ThemeService')
       throw error
-    }
-  }
-
-  /**
-   * 重新创建高亮器实例
-   */
-  private async recreateHighlighter(): Promise<void> {
-    try {
-      // 保留当前已加载的语言和主题
-      const currentLanguages = Array.from(this._loadedLanguages)
-      const currentThemes = Array.from(this._loadedThemes)
-
-      // 创建新的高亮器实例
-      const newHighlighter = await createHighlighter({
-        themes: currentThemes,
-        langs: currentLanguages,
-      })
-
-      // 替换当前高亮器
-      this.disposeCurrentHighlighter()
-      this._highlighter = newHighlighter
-    }
-    catch (error) {
-      ErrorHandler.logError('重新创建高亮器失败', error, 'ThemeService')
-      throw error
-    }
-  }
-
-  /**
-   * 强制重新加载语言（用于主题切换后）
-   */
-  private async forceReloadLanguage(language: string): Promise<void> {
-    if (!this._highlighter) {
-      return
-    }
-
-    try {
-      // 使用语言映射，将 shell 相关语言映射到 shellscript
-      const mappedLanguage = mapLanguageToShiki(language)
-
-      // 检查语言是否受支持
-      if (!isSupportedLanguage(mappedLanguage)) {
-        throw new Error(`语言 ${mappedLanguage} 不受支持`)
-      }
-
-      // 强制重新加载语言到当前高亮器
-      try {
-        await (this._highlighter as any).loadLanguage(mappedLanguage)
-        this._loadedLanguages.add(mappedLanguage)
-      }
-      catch {
-        ErrorHandler.logWarning(`强制重新加载语言失败: ${mappedLanguage}`, 'ThemeService')
-
-        // 如果直接加载失败，尝试重新创建高亮器实例
-        try {
-          await this.recreateHighlighter()
-          await (this._highlighter as any).loadLanguage(mappedLanguage)
-          this._loadedLanguages.add(mappedLanguage)
-        }
-        catch {
-          ErrorHandler.logWarning(`重新创建高亮器后仍无法加载语言: ${mappedLanguage}`, 'ThemeService')
-        }
-      }
-    }
-    catch {
-      ErrorHandler.logWarning(`强制重新加载语言失败: ${language}`, 'ThemeService')
     }
   }
 
@@ -908,34 +774,6 @@ export class ThemeService {
   async preloadLanguages(languages: string[]): Promise<void> {
     const promises = languages.map(lang => this.preloadLanguage(lang))
     await Promise.allSettled(promises)
-  }
-
-  /**
-   * 根据 Markdown 内容按需加载语言
-   * @param content Markdown 内容
-   */
-  async preloadLanguagesFromContent(content: string): Promise<void> {
-    try {
-      // 检测文档中使用的语言
-      const detectedLanguages = detectLanguages(content)
-
-      if (detectedLanguages.length === 0) {
-        return
-      }
-
-      // 过滤出未加载的语言
-      const unloadedLanguages = detectedLanguages.filter((lang: string) => !this._loadedLanguages.has(lang))
-
-      if (unloadedLanguages.length === 0) {
-        return
-      }
-
-      // 并行加载所有需要的语言
-      await this.preloadLanguages(unloadedLanguages)
-    }
-    catch (error) {
-      console.error('Failed to preload languages from content:', error)
-    }
   }
 
   private disposeCurrentHighlighter(): void {

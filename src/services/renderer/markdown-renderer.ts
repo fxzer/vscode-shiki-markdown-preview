@@ -752,12 +752,9 @@ export class MarkdownRenderer {
     const dataLineMatches = html.match(/data-line="\d+"/g)
     const dataLineCount = dataLineMatches ? dataLineMatches.length : 0
 
-    // 记录统计信息用于调试
-    if (dataLineCount < Math.max(1, totalLines * 0.1)) { // 至少应该有10%的行有映射
+    // 行号映射统计（仅警告覆盖率过低的情况）
+    if (dataLineCount < Math.max(1, totalLines * 0.1)) {
       console.warn(`[MarkdownRenderer] 行号映射可能不完整: ${dataLineCount} 个 data-line 属性，总共 ${totalLines} 行`)
-    }
-    else {
-      // 行号映射完成
     }
   }
 

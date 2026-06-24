@@ -49,6 +49,7 @@ export class MarkdownPreviewPanel {
   private _lastRenderedDocumentVersion: number | undefined
   private _lastRenderedTheme: string | undefined
   private _lastRenderUsedKatex: boolean = false
+  private _lastRenderUsedMermaid: boolean = false
   private _hasRenderedWebview: boolean = false
   private _isWebviewReady: boolean = false
   private _renderGeneration: number = 0
@@ -579,14 +580,16 @@ export class MarkdownPreviewPanel {
       return
     }
 
+    // 检测渲染内容中是否包含 Mermaid 图表，按需加载（500KB+ 的库）
+    const hasMermaid = renderedContent.includes('language-mermaid')
+
     // 主题变化不需要 full reload：WebView 保持活跃，通过 postMessage 增量更新即可
+    // KaTeX CSS / Mermaid JS 只能在 full reload 时注入，状态变化时必须强制重建
     const needsFullReload = options.forceFullReload
       || !this._hasRenderedWebview
       || !this._isWebviewReady
       || this._lastRenderUsedKatex !== enableKatex
-
-    // 检测渲染内容中是否包含 Mermaid 图表，按需加载（500KB+ 的库）
-    const hasMermaid = renderedContent.includes('language-mermaid')
+      || this._lastRenderUsedMermaid !== hasMermaid
 
     const htmlOptions = {
       webview: this._panel.webview,
@@ -626,6 +629,7 @@ export class MarkdownPreviewPanel {
     }
 
     this._lastRenderUsedKatex = enableKatex
+    this._lastRenderUsedMermaid = hasMermaid
 
     // 更新面板标题 - 优先使用 front matter 中的 title
     this.updatePanelTitle(document, frontMatterData)
@@ -699,6 +703,7 @@ export class MarkdownPreviewPanel {
     this._hasRenderedWebview = true
     this._isWebviewReady = false
     this._lastRenderUsedKatex = false
+    this._lastRenderUsedMermaid = false
   }
 
   /**
@@ -727,6 +732,7 @@ export class MarkdownPreviewPanel {
     this._hasRenderedWebview = true
     this._isWebviewReady = false
     this._lastRenderUsedKatex = false
+    this._lastRenderUsedMermaid = false
   }
 
   /**
