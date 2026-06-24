@@ -564,8 +564,9 @@ export class MarkdownPreviewPanel {
     const frontMatterData = this._markdownRenderer.getFrontMatterData(content)
     const renderedContent = await this._markdownRenderer.render(content, document)
 
-    // 检测是否包含数学公式
-    const enableKatex = hasMathExpressions(content)
+    // 使用 renderer 中已检测的数学公式结果，避免重复扫描
+    // renderer.render() 内部已调用 hasMathExpressions
+    const enableKatex = this._markdownRenderer.currentContentHasMath
 
     // 等待主题 CSS 变量
     const themeCSSVariables = await this._themeService.getThemeCSSVariables()

@@ -23,6 +23,7 @@ export class MarkdownRenderer {
   private _themeService: ThemeService
   private _currentDocument: vscode.TextDocument | undefined
   private _katexEnabled: boolean = false
+  private _currentContentHasMath: boolean = false
 
   constructor(themeService: ThemeService) {
     this._themeService = themeService
@@ -69,6 +70,8 @@ export class MarkdownRenderer {
 
     const hasMath = hasMathExpressions(content)
 
+    this._currentContentHasMath = hasMath
+
     if (hasMath && !this._katexEnabled) {
       try {
         // 启用 KaTeX 插件 - 使用官方推荐配置
@@ -92,6 +95,14 @@ export class MarkdownRenderer {
         ErrorHandler.logError('启用 KaTeX 失败', error, 'MarkdownRenderer')
       }
     }
+  }
+
+  /**
+   * 当前渲染的内容是否包含数学公式（由上一次 render() 检测）
+   */
+  get currentContentHasMath(): boolean {
+    return this._currentContentHasMath
+  }
   }
 
   /**

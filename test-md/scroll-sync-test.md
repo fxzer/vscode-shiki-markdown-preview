@@ -34,7 +34,7 @@
 
 下面是一些代码示例，用于测试代码块的滚动同步：
 
-\`\`\`javascript
+```javascript
 // 旧的实现 - 性能问题
 function getEffectiveContentHeight() {
 const contentElements = document.querySelectorAll('\*') // 昂贵！
@@ -44,9 +44,9 @@ const rect = element.getBoundingClientRect() // 强制重排！
 const computedStyle = window.getComputedStyle(element) // 强制重排！
 }
 }
-\`\`\`
+```
 
-\`\`\`javascript
+```javascript
 // 新的实现 - 高性能
 class IntersectionBasedScrollSync {
 constructor() {
@@ -71,7 +71,7 @@ this.visibleElements.delete(lineNumber)
 })
 }
 }
-\`\`\`
+```
 
 ## 第三节：更多内容
 
@@ -87,13 +87,13 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
 
 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
 
-\`\`\`python
+```python
 def calculate_performance():
 old_latency = 200 # ms
 new_latency = 20 # ms
 improvement = (old_latency - new_latency) / old_latency \* 100
 print(f"性能提升: {improvement}%") # 90% 提升！
-\`\`\`
+```
 
 ## 第四节：列表测试
 
@@ -133,7 +133,7 @@ print(f"性能提升: {improvement}%") # 90% 提升！
 
 ## 第七节：更多代码
 
-\`\`\`typescript
+```typescript
 interface ScrollSyncMessage {
 command: 'syncScrollToLine' | 'previewScrolledToLine'
 line: number
@@ -144,7 +144,7 @@ window.vscode.postMessage({
 command: 'previewScrolledToLine',
 line: 42
 })
-\`\`\`
+```
 
 ## 第八节：任务列表
 
@@ -160,7 +160,7 @@ line: 42
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vestibulum tortor quam, feugiat vitae, ultricies eget, tempor sit amet, ante.
 
-\`\`\`bash
+```bash
 
 # 编译项目
 
@@ -169,7 +169,7 @@ npm run compile
 # 打包扩展
 
 npm run ext:package
-\`\`\`
+```
 
 ## 第十节：总结
 
