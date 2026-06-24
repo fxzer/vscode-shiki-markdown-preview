@@ -35,11 +35,7 @@ export class ThemeService {
    */
   async initializeHighlighter(): Promise<void> {
     try {
-      // 首先初始化主题缓存
-      if (!this._themeCache.loaded) {
-        await this.discoverAndCacheThemes()
-      }
-
+      // 不再提前加载全部主题元数据，改为按需延迟加载（打开主题选择器时）
       // 只预加载实际生效主题和常用语言
       const currentTheme = this._configService.getEffectiveTheme()
       this._currentTheme = currentTheme
