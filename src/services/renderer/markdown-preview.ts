@@ -9,7 +9,6 @@ import {
   ThemeService,
 } from '..'
 import { ErrorHandler } from '../../utils/error-handler'
-import { hasMathExpressions } from '../../utils/math-detector'
 import { PathResolver } from '../../utils/path-resolver'
 import { ScrollSyncManager } from '../scroll-sync'
 import { MarkdownRenderer } from './markdown-renderer'

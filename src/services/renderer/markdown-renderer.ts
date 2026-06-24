@@ -103,7 +103,6 @@ export class MarkdownRenderer {
   get currentContentHasMath(): boolean {
     return this._currentContentHasMath
   }
-  }
 
   /**
    * Set up container plugins for custom containers
