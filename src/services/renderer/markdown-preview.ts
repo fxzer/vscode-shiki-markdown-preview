@@ -9,7 +9,6 @@ import {
   ThemeService,
 } from '..'
 import { ErrorHandler } from '../../utils/error-handler'
-import { hasMathExpressions } from '../../utils/math-detector'
 import { PathResolver } from '../../utils/path-resolver'
 import { ScrollSyncManager } from '../scroll-sync'
 import { MarkdownRenderer } from './markdown-renderer'
@@ -50,6 +49,7 @@ export class MarkdownPreviewPanel {
   private _lastRenderedDocumentVersion: number | undefined
   private _lastRenderedTheme: string | undefined
   private _lastRenderUsedKatex: boolean = false
+  private _lastRenderUsedMermaid: boolean = false
   private _hasRenderedWebview: boolean = false
   private _isWebviewReady: boolean = false
   private _renderGeneration: number = 0
@@ -558,14 +558,13 @@ export class MarkdownPreviewPanel {
     options: { forceFullReload?: boolean, renderGeneration?: number } = {},
   ): Promise<void> {
     const content = document.getText()
-    const themeBeforeRender = this._themeService.currentTheme
 
     // 获取 front matter 数据
     const frontMatterData = this._markdownRenderer.getFrontMatterData(content)
     const renderedContent = await this._markdownRenderer.render(content, document)
 
-    // 检测是否包含数学公式
-    const enableKatex = hasMathExpressions(content)
+    // 使用 renderer 中已检测的数学公式结果，避免重复扫描
+    const enableKatex = this._markdownRenderer.currentContentHasMath
 
     // 等待主题 CSS 变量
     const themeCSSVariables = await this._themeService.getThemeCSSVariables()
@@ -581,12 +580,16 @@ export class MarkdownPreviewPanel {
       return
     }
 
-    const themeChanged = this._lastRenderedTheme !== undefined && this._lastRenderedTheme !== themeBeforeRender
+    // 检测渲染内容中是否包含 Mermaid 图表，按需加载（500KB+ 的库）
+    const hasMermaid = renderedContent.includes('language-mermaid')
+
+    // 主题变化不需要 full reload：WebView 保持活跃，通过 postMessage 增量更新即可
+    // KaTeX CSS / Mermaid JS 只能在 full reload 时注入，状态变化时必须强制重建
     const needsFullReload = options.forceFullReload
       || !this._hasRenderedWebview
       || !this._isWebviewReady
       || this._lastRenderUsedKatex !== enableKatex
-      || themeChanged
+      || this._lastRenderUsedMermaid !== hasMermaid
 
     const htmlOptions = {
       webview: this._panel.webview,
@@ -600,6 +603,7 @@ export class MarkdownPreviewPanel {
       enableScrollSync: this.getScrollSyncSetting(), // 传递滚动同步设置
       enableScrollSyncDebug: this.getScrollSyncDebugSetting(), // 传递滚动同步排查日志设置
       enableKatex, // 传递 KaTeX 启用状态
+      enableMermaid: hasMermaid, // 按需加载 Mermaid（仅在文档包含 mermaid 图表时）
       expandTocByDefault: this.getTocExpandSetting(), // 传递目录展开设置
     }
 
@@ -625,6 +629,7 @@ export class MarkdownPreviewPanel {
     }
 
     this._lastRenderUsedKatex = enableKatex
+    this._lastRenderUsedMermaid = hasMermaid
 
     // 更新面板标题 - 优先使用 front matter 中的 title
     this.updatePanelTitle(document, frontMatterData)
@@ -698,6 +703,7 @@ export class MarkdownPreviewPanel {
     this._hasRenderedWebview = true
     this._isWebviewReady = false
     this._lastRenderUsedKatex = false
+    this._lastRenderUsedMermaid = false
   }
 
   /**
@@ -726,6 +732,7 @@ export class MarkdownPreviewPanel {
     this._hasRenderedWebview = true
     this._isWebviewReady = false
     this._lastRenderUsedKatex = false
+    this._lastRenderUsedMermaid = false
   }
 
   /**
@@ -758,9 +765,10 @@ export class MarkdownPreviewPanel {
         await this._markdownRenderer.reloadLanguagesAfterThemeChange(this._currentDocument.getText())
       }
 
-      // 更新内容以应用新主题
+      // 使用增量更新而非 full reload 来应用新主题
+      // 新主题的代码高亮 HTML 已包含正确的颜色，只需通过 postMessage 更新内容
       if (this._currentDocument) {
-        await this.updateContent(this._currentDocument, { forceFullReload: true })
+        await this.updateContent(this._currentDocument)
       }
       else {
         await this.renderEmptyPanel()

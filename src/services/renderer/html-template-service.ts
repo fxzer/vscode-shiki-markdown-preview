@@ -15,6 +15,7 @@ export interface HTMLTemplateOptions {
   enableScrollSync?: boolean
   enableScrollSyncDebug?: boolean
   enableKatex?: boolean
+  enableMermaid?: boolean
   expandTocByDefault?: boolean
 }
 
@@ -36,17 +37,17 @@ export class HTMLTemplateService {
       enableScrollSync = true,
       enableScrollSyncDebug = false,
       enableKatex = false,
+      enableMermaid = false,
       expandTocByDefault = false,
     } = options
 
-    // 模块化脚本加载 - 根据设置条件性加载滚动同步脚本
+    // 模块化脚本加载 - 根据设置条件性加载滚动同步和 Mermaid 脚本
     const scriptModules = [
       'utils.js',
       'syntax-highlight.js',
       'link-handler.js',
       'task-checkbox-handler.js',
-      'mermaid.min.js',
-      'mermaid-renderer.js',
+      ...(enableMermaid ? ['mermaid.min.js', 'mermaid-renderer.js'] : []),
       ...(enableScrollSync ? ['scroll-sync.js'] : []),
       'notion-toc.js',
       'search-highlight.js',

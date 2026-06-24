@@ -23,6 +23,7 @@ export class MarkdownRenderer {
   private _themeService: ThemeService
   private _currentDocument: vscode.TextDocument | undefined
   private _katexEnabled: boolean = false
+  private _currentContentHasMath: boolean = false
 
   constructor(themeService: ThemeService) {
     this._themeService = themeService
@@ -69,6 +70,8 @@ export class MarkdownRenderer {
 
     const hasMath = hasMathExpressions(content)
 
+    this._currentContentHasMath = hasMath
+
     if (hasMath && !this._katexEnabled) {
       try {
         // 启用 KaTeX 插件 - 使用官方推荐配置
@@ -92,6 +95,13 @@ export class MarkdownRenderer {
         ErrorHandler.logError('启用 KaTeX 失败', error, 'MarkdownRenderer')
       }
     }
+  }
+
+  /**
+   * 当前渲染的内容是否包含数学公式（由上一次 render() 检测）
+   */
+  get currentContentHasMath(): boolean {
+    return this._currentContentHasMath
   }
 
   /**
@@ -742,12 +752,9 @@ export class MarkdownRenderer {
     const dataLineMatches = html.match(/data-line="\d+"/g)
     const dataLineCount = dataLineMatches ? dataLineMatches.length : 0
 
-    // 记录统计信息用于调试
-    if (dataLineCount < Math.max(1, totalLines * 0.1)) { // 至少应该有10%的行有映射
+    // 行号映射统计（仅警告覆盖率过低的情况）
+    if (dataLineCount < Math.max(1, totalLines * 0.1)) {
       console.warn(`[MarkdownRenderer] 行号映射可能不完整: ${dataLineCount} 个 data-line 属性，总共 ${totalLines} 行`)
-    }
-    else {
-      // 行号映射完成
     }
   }
 
