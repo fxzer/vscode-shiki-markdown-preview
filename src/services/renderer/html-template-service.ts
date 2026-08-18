@@ -46,6 +46,7 @@ export class HTMLTemplateService {
       'utils.js',
       'syntax-highlight.js',
       'link-handler.js',
+      'image-viewer.js',
       'task-checkbox-handler.js',
       ...(enableMermaid ? ['mermaid.min.js', 'mermaid-renderer.js'] : []),
       ...(enableScrollSync ? ['scroll-sync.js'] : []),
@@ -71,7 +72,7 @@ export class HTMLTemplateService {
             <html lang="en" data-markdown-theme-type="${markdownThemeType}">
             <head>
                 <meta charset="UTF-8">
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: data:; script-src 'nonce-${nonce}'; connect-src https:;">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: http: data: blob:; script-src 'nonce-${nonce}'; connect-src https:;">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <link href="${webviewCssUri}" rel="stylesheet">
                 <link href="${searchCssUri}" rel="stylesheet">${katexCSS}
@@ -173,15 +174,32 @@ export class HTMLTemplateService {
   }
 
   /**
-   * Generate webview options
+   * Generate webview options with dynamic local resource roots
    */
-  static getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
+  static getWebviewOptions(extensionUri: vscode.Uri, documentUri?: vscode.Uri): vscode.WebviewOptions {
+    const roots: vscode.Uri[] = [
+      vscode.Uri.joinPath(extensionUri, 'src/webview'),
+      vscode.Uri.joinPath(extensionUri, 'src/webview/modules'),
+      vscode.Uri.joinPath(extensionUri, 'out/webview'),
+      vscode.Uri.joinPath(extensionUri, 'out/webview/modules'),
+    ]
+
+    // 允许访问工作区所有根目录
+    if (vscode.workspace.workspaceFolders) {
+      for (const folder of vscode.workspace.workspaceFolders) {
+        roots.push(folder.uri)
+      }
+    }
+
+    // 允许访问当前 Markdown 文件所在目录
+    if (documentUri) {
+      const documentDir = vscode.Uri.joinPath(documentUri, '..')
+      roots.push(documentDir)
+    }
+
     return {
       enableScripts: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(extensionUri, 'src/webview'),
-        vscode.Uri.joinPath(extensionUri, 'src/webview/modules'),
-      ],
+      localResourceRoots: roots,
     }
   }
 }

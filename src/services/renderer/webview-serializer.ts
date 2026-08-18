@@ -8,7 +8,6 @@ export interface WebviewState {
 }
 
 export class MarkdownPreviewSerializer implements vscode.WebviewPanelSerializer {
-  // eslint-disable-next-line unused-imports/no-unused-vars
   constructor(private extensionUri: vscode.Uri) {}
 
   async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, _state: WebviewState | undefined) {

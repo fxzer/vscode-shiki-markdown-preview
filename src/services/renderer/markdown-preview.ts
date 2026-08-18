@@ -88,7 +88,7 @@ export class MarkdownPreviewPanel {
       MarkdownPreviewPanel.viewType,
       'Markdown Preview',
       viewColumn,
-      HTMLTemplateService.getWebviewOptions(extensionUri),
+      HTMLTemplateService.getWebviewOptions(extensionUri, document?.uri),
     )
 
     const previewPanel = new MarkdownPreviewPanel(panel, extensionUri, document)
@@ -557,11 +557,14 @@ export class MarkdownPreviewPanel {
     document: vscode.TextDocument,
     options: { forceFullReload?: boolean, renderGeneration?: number } = {},
   ): Promise<void> {
+    // 动态更新 Webview 资源根目录权限，确保包含当前 Markdown 文件所在目录和工作区目录
+    this._panel.webview.options = HTMLTemplateService.getWebviewOptions(this._extensionUri, document.uri)
+
     const content = document.getText()
 
     // 获取 front matter 数据
     const frontMatterData = this._markdownRenderer.getFrontMatterData(content)
-    const renderedContent = await this._markdownRenderer.render(content, document)
+    const renderedContent = await this._markdownRenderer.render(content, document, this._panel.webview)
 
     // 使用 renderer 中已检测的数学公式结果，避免重复扫描
     const enableKatex = this._markdownRenderer.currentContentHasMath

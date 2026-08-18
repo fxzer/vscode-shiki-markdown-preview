@@ -373,6 +373,19 @@ img {
   margin: 0.5rem 0;
 }
 
+#markdown-content img {
+  cursor: zoom-in;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+#markdown-content img:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  filter: brightness(1.02);
+}
+
 /* 文本强调元素样式 */
 strong,
 b {
@@ -852,4 +865,172 @@ blockquote p:last-child {
   margin: 8px 0;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* ==========================================================================
+   图片大图查看器弹窗 (Image Viewer Modal)
+   ========================================================================== */
+
+body.image-viewer-locked {
+  overflow: hidden !important;
+}
+
+.image-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.image-viewer-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.image-viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.image-viewer-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  color: #ffffff;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.image-viewer-close-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.08) rotate(90deg);
+  color: #ffffff;
+}
+
+.image-viewer-close-btn:active {
+  transform: scale(0.95);
+}
+
+.image-viewer-viewport {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.image-viewer-viewport.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.image-viewer-img {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  transform-origin: center center;
+  will-change: transform;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  border-radius: 6px;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.image-viewer-img.is-dragging {
+  transition: none !important;
+}
+
+/* 悬浮工具栏 (Floating Glassmorphism Toolbar) */
+.image-viewer-toolbar {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(25, 25, 28, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 32px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.image-viewer-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.image-viewer-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.image-viewer-btn:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.image-viewer-percentage {
+  min-width: 52px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'SF Pro Text', monospace;
+  color: #ffffff;
+  padding: 0 4px;
+  user-select: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.image-viewer-percentage:hover {
+  color: var(--textLink-foreground, #4fc1ff);
+}
+
+.image-viewer-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 2px;
 }

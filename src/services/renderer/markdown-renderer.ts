@@ -1,5 +1,5 @@
-import type * as vscode from 'vscode'
 import type { ThemeService } from '../theme/theme-service'
+import * as path from 'node:path'
 import { container } from '@mdit/plugin-container'
 import { katex } from '@mdit/plugin-katex'
 import matter from 'gray-matter'
@@ -12,6 +12,7 @@ import markdownItMark from 'markdown-it-mark'
 import markdownItSub from 'markdown-it-sub'
 import markdownItSup from 'markdown-it-sup'
 import * as markdownItCheckbox from 'markdown-it-task-checkbox'
+import * as vscode from 'vscode'
 import { escapeHtml } from '../../utils/common'
 import { ErrorHandler } from '../../utils/error-handler'
 import { detectLanguages } from '../../utils/language-detector'
@@ -22,6 +23,7 @@ export class MarkdownRenderer {
   private _markdownIt: MarkdownIt | undefined
   private _themeService: ThemeService
   private _currentDocument: vscode.TextDocument | undefined
+  private _currentWebview: vscode.Webview | undefined
   private _katexEnabled: boolean = false
   private _currentContentHasMath: boolean = false
 
@@ -293,6 +295,124 @@ export class MarkdownRenderer {
 
       return renderer.renderToken(tokens, idx, options)
     }
+
+    // 处理 Markdown 语法图片的相对路径与本地路径转换
+    const defaultImageRender = this._markdownIt.renderer.rules.image
+      || ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
+
+    this._markdownIt.renderer.rules.image = (tokens, idx, options, env, renderer) => {
+      const token = tokens[idx]
+      const srcIndex = token.attrIndex('src')
+
+      if (srcIndex >= 0 && token.attrs && token.attrs[srcIndex]) {
+        const originalSrc = token.attrs[srcIndex][1]
+        const resolvedSrc = this.resolveImageSrc(originalSrc, this._currentDocument, this._currentWebview)
+        token.attrs[srcIndex][1] = resolvedSrc
+      }
+
+      return defaultImageRender(tokens, idx, options, env, renderer)
+    }
+  }
+
+  /**
+   * 解析图片路径为 Webview 可访问的 URI
+   */
+  resolveImageSrc(src: string, document?: vscode.TextDocument, webview?: vscode.Webview): string {
+    if (!src || typeof src !== 'string') {
+      return ''
+    }
+
+    const trimmed = src.trim()
+    if (!trimmed) {
+      return ''
+    }
+
+    // 常见的网络协议与特殊协议直接放行
+    if (/^(?:https?:\/\/|data:|blob:|vscode-webview-resource:|vscode-resource:|\/\/)/i.test(trimmed)) {
+      return trimmed
+    }
+
+    if (!document || !webview) {
+      return trimmed
+    }
+
+    try {
+      // 提取 hash 和 query 参数（如 ./image.png?v=1#preview）
+      let cleanPath = trimmed
+      let suffix = ''
+      const hashIndex = cleanPath.indexOf('#')
+      const queryIndex = cleanPath.indexOf('?')
+      let splitIndex = -1
+      if (hashIndex !== -1 && queryIndex !== -1) {
+        splitIndex = Math.min(hashIndex, queryIndex)
+      }
+      else if (hashIndex !== -1) {
+        splitIndex = hashIndex
+      }
+      else if (queryIndex !== -1) {
+        splitIndex = queryIndex
+      }
+
+      if (splitIndex !== -1) {
+        suffix = cleanPath.slice(splitIndex)
+        cleanPath = cleanPath.slice(0, splitIndex)
+      }
+
+      // 解码 URL 编码字符（如空格 %20 等）
+      try {
+        cleanPath = decodeURIComponent(cleanPath)
+      }
+      catch {
+        // 解码失败时保留原样
+      }
+
+      let targetUri: vscode.Uri | null = null
+
+      if (path.isAbsolute(cleanPath)) {
+        // 绝对路径（POSIX: /Users/... 或 Windows: C:\...）
+        targetUri = vscode.Uri.file(cleanPath)
+      }
+      else {
+        // 相对路径：相对于当前文档目录
+        const docDir = path.dirname(document.fileName)
+        const resolvedPath = path.resolve(docDir, cleanPath)
+        targetUri = vscode.Uri.file(resolvedPath)
+      }
+
+      if (targetUri) {
+        const webviewUri = webview.asWebviewUri(targetUri).toString()
+        return suffix ? `${webviewUri}${suffix}` : webviewUri
+      }
+    }
+    catch {
+      ErrorHandler.logWarning(`图片路径解析失败: ${src}`, 'MarkdownRenderer')
+    }
+
+    return trimmed
+  }
+
+  /**
+   * 将 HTML 文本中的 <img> 标签的本地 src 解析为 Webview URI
+   */
+  private resolveHtmlImages(html: string, document?: vscode.TextDocument, webview?: vscode.Webview): string {
+    if (!document || !webview || !html) {
+      return html
+    }
+
+    return html.replace(/<img\b([^>]*)>/gi, (imgTag, attrs) => {
+      const srcMatch = attrs.match(/\bsrc=(["'])(.*?)\1/i)
+      if (!srcMatch) {
+        return imgTag
+      }
+      const originalSrc = srcMatch[2]
+      const resolvedSrc = this.resolveImageSrc(originalSrc, document, webview)
+      if (resolvedSrc === originalSrc) {
+        return imgTag
+      }
+      const newSrcAttr = `src=${srcMatch[1]}${resolvedSrc}${srcMatch[1]}`
+      const newAttrs = attrs.replace(srcMatch[0], newSrcAttr)
+      return `<img${newAttrs}>`
+    })
   }
 
   /**
@@ -479,13 +599,17 @@ export class MarkdownRenderer {
    * Render markdown content with reliable line number mapping for scroll sync
    * 为每个块级元素添加 data-line 属性，确保精确的滚动同步
    */
-  async render(content: string, document?: vscode.TextDocument): Promise<string> {
+  async render(content: string, document?: vscode.TextDocument, webview?: vscode.Webview): Promise<string> {
     if (!this._markdownIt) {
       throw new Error('Markdown renderer not initialized')
     }
 
     if (document) {
       this._currentDocument = document
+    }
+
+    if (webview) {
+      this._currentWebview = webview
     }
 
     try {
@@ -579,7 +703,10 @@ export class MarkdownRenderer {
         // 验证 data-line 属性的完整性
         this.validateLineMapping(html, lines.length)
 
-        return html
+        // 解析 HTML 标签中的图片路径（如 <img src="./screenshots/..." />）为 Webview URI
+        const resolvedHtml = this.resolveHtmlImages(html, this._currentDocument, this._currentWebview)
+
+        return resolvedHtml
       }
       finally {
         Object.assign(this._markdownIt.renderer.rules, originalRules)
@@ -761,5 +888,6 @@ export class MarkdownRenderer {
   dispose(): void {
     this._markdownIt = undefined
     this._currentDocument = undefined
+    this._currentWebview = undefined
   }
 }

@@ -114,6 +114,17 @@ function handleExtensionMessage(event) {
           )
         }
 
+        // 重新初始化图片大图查看器
+        if (window.initializeImageViewer) {
+          window.robustInitialize(
+            () => document.getElementById('markdown-content'),
+            window.initializeImageViewer,
+            'Image viewer reinitialization failed after content update.',
+            3,
+            50,
+          )
+        }
+
         // 重新初始化NotionToc
         if (window.NotionToc) {
           window.robustInitialize(
@@ -259,6 +270,15 @@ function initializeWebviewModules() {
       () => document.getElementById('markdown-content'),
       window.initializeTaskCheckboxHandling,
       'Task checkbox initialization failed: Markdown content not found.',
+    )
+  }
+
+  // 检查图片大图查看器初始化条件
+  if (window.robustInitialize && window.initializeImageViewer) {
+    window.robustInitialize(
+      () => document.getElementById('markdown-content'),
+      window.initializeImageViewer,
+      'Image viewer initialization failed: Markdown content not found.',
     )
   }
 

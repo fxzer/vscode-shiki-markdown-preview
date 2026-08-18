@@ -74,7 +74,7 @@ node_modules/shiki/**/scripts/
 node_modules/shiki/**/docs/
 
 # 其他大体积依赖优化
-node_modules/**/locale/  # 本地化文件
+node_modules/**/locale/
 node_modules/**/locales/
 node_modules/**/i18n/
 examples

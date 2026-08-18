@@ -1,8 +1,8 @@
 {
-  "publisher": "fxzer8888",
-  "name": "shiki-markdown-preview",
-  "displayName": "Shiki Markdown Preview",
-  "version": "1.6.0",
+  "publisher": "fxzer",
+  "name": "vscode-shiki-markdown-preview",
+  "displayName": "VSCode Shiki Markdown Preview",
+  "version": "1.6.2",
   "private": true,
   "description": "一个功能强大的 VS Code 扩展，提供基于 Shiki 的 Markdown 预览功能，支持 60+ 种语法高亮主题。",
   "license": "MIT",
@@ -348,11 +348,11 @@
   "scripts": {
     "vscode:prepublish": "npm run compile && npm run copy-assets",
     "compile": "tsc -p ./",
-    "copy-assets": "cp -r src/webview/*.css src/webview/*.js out/webview/ 2>/dev/null || true",
+    "copy-assets": "mkdir -p out/webview && cp -r src/webview/*.css src/webview/*.js out/webview/ && mkdir -p out/webview/modules && cp -r src/webview/modules/*.js out/webview/modules/",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "watch": "tsc -w -p ./",
-    "ext:package": "vsce package",
+    "ext:package": "node scripts/package.js",
     "publish": "node scripts/publish.js"
   },
   "dependencies": {
@@ -386,9 +386,9 @@
     "@types/throttle-debounce": "^5.0.2",
     "@types/vscode": "^1.100.0",
     "@types/vscode-webview": "^1.57.0",
+    "@vscode/vsce": "^2.32.0",
     "eslint": "^9.13.0",
     "eslint-plugin-format": "^1.0.1",
-    "typescript": "^5.9.2",
-    "vsce": "^2.15.0"
+    "typescript": "^5.9.2"
   }
 }
