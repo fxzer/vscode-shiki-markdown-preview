@@ -353,7 +353,8 @@
     "lint:fix": "eslint . --fix",
     "watch": "tsc -w -p ./",
     "ext:package": "node scripts/package.js",
-    "publish": "node scripts/publish.js"
+    "publish": "node scripts/publish.js",
+    "release": "node release.js"
   },
   "dependencies": {
     "@mdit/plugin-container": "^0.22.1",
