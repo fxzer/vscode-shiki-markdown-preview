@@ -66,7 +66,7 @@ class NotionToc {
       return
 
     this.headers = []
-    const headerElements = content.querySelectorAll('h1, h2, h3')
+    const headerElements = content.querySelectorAll('h1, h2, h3, h4, h5, h6')
 
     headerElements.forEach((header, index) => {
       const id = header.id || `header-${index}`
@@ -101,8 +101,8 @@ class NotionToc {
       line.className = 'toc-line'
       line.setAttribute('data-index', index)
       const lineBar = document.createElement('div')
-      lineBar.className = 'toc-line-bar'
-      const widthMap = { 1: 16, 2: 12, 3: 8 }
+      lineBar.className = `toc-line-bar level-${header.level}`
+      const widthMap = { 1: 18, 2: 15, 3: 12, 4: 10, 5: 8, 6: 6 }
       lineBar.style.width = `${widthMap[header.level] || 8}px`
       line.appendChild(lineBar)
       this.linesContainer.appendChild(line)
@@ -111,13 +111,13 @@ class NotionToc {
       // 渲染详细视图
       const item = document.createElement('div')
       const text = this.escapeHtml(header.text)
-      item.className = 'toc-item'
+      item.className = `toc-item level-${header.level}`
       item.href = `#${header.id}`
       item.setAttribute('data-index', index)
-      item.setAttribute('title', text)
-      const indentMap = { 1: 0, 2: 16, 3: 32 }
-      item.style.marginLeft = `${indentMap[header.level] || 0}px`
-      item.innerHTML = `${text}`
+      item.setAttribute('title', `H${header.level}: ${header.text}`)
+      const indentMap = { 1: 0, 2: 8, 3: 16, 4: 24, 5: 32, 6: 40 }
+      item.style.paddingLeft = `${indentMap[header.level] || 0}px`
+      item.innerHTML = `<span class="toc-level-tag level-${header.level}">H${header.level}</span><span class="toc-item-text">${text}</span>`
       this.itemsContainer.appendChild(item)
       this.tocItems.push(item) // 缓存节点
     })

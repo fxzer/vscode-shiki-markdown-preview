@@ -27,7 +27,7 @@ if (!existsSync(npmRoot)) {
   mkdirSync(tmpRoot, { recursive: true })
   const tmpPkg = { name: pkg.name, version: pkg.version, dependencies: pkg.dependencies, private: true }
   writeFileSync(resolve(tmpRoot, 'package.json'), JSON.stringify(tmpPkg, null, 2))
-  execSync('npm install --production --ignore-scripts', { cwd: tmpRoot, stdio: 'inherit' })
+  execSync('npm install --omit=dev --no-audit --no-fund', { cwd: tmpRoot, stdio: 'inherit', env: { ...process.env, npm_config_allow_scripts: '' } })
   renameSync(resolve(tmpRoot, 'node_modules'), npmRoot)
   rmSync(tmpRoot, { recursive: true, force: true })
 } else {
@@ -59,7 +59,18 @@ try {
 
 // 7. Restore pnpm node_modules
 console.log('6. Restoring pnpm node_modules...')
-rmSync(resolve(root, 'node_modules'), { recursive: true, force: true })
-renameSync(pnpmModules, resolve(root, 'node_modules'))
+try {
+  execSync(`rm -rf "${resolve(root, 'node_modules')}"`)
+  if (existsSync(pnpmModules)) {
+    renameSync(pnpmModules, resolve(root, 'node_modules'))
+  }
+} catch (e) {
+  console.warn('Warning restoring node_modules:', e.message)
+}
+if (!existsSync(resolve(root, 'node_modules', '.bin', 'tsc'))) {
+  try {
+    execSync('pnpm install', { stdio: 'inherit' })
+  } catch {}
+}
 
 console.log('\n✅ Done!')

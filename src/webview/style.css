@@ -794,31 +794,33 @@ blockquote p:last-child {
   background-color: var(--editor-background, var(--vscode-editor-background));
   border: 1px solid var(--markdown-blockQuote-background-level3);
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
   backdrop-filter: blur(10px);
-  min-width: 200px;
-  max-width: 240px;
-  max-height: 400px;
+  min-width: 220px;
+  max-width: 300px;
+  max-height: 480px;
   overflow-y: auto;
 }
 
 .toc-items {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .toc-item {
-  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
   border-radius: 4px;
   cursor: pointer;
   text-align: left;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--editor-foreground, var(--vscode-foreground));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .toc-item:hover {
@@ -828,7 +830,92 @@ blockquote p:last-child {
 .toc-item.active {
   background-color: var(--markdown-blockQuote-background-level3);
   color: var(--textLink-foreground);
+  font-weight: 600;
 }
+
+/* 淡淡的水印/层级标签 H1-H6 */
+.toc-level-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: 1;
+  padding: 1.5px 3.5px;
+  border-radius: 3px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  user-select: none;
+  letter-spacing: 0.02em;
+  opacity: 0.45;
+  background: rgba(128, 128, 128, 0.15);
+  color: var(--editor-foreground, var(--vscode-foreground));
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.toc-item:hover .toc-level-tag {
+  opacity: 0.85;
+}
+
+.toc-item.active .toc-level-tag {
+  opacity: 1;
+  background: rgba(var(--vscode-focusBorder), 0.15);
+  color: var(--textLink-foreground, var(--vscode-textLink-foreground));
+  border-color: rgba(var(--vscode-focusBorder), 0.35);
+}
+
+.toc-level-tag.level-1 {
+  opacity: 0.7;
+  background: rgba(59, 130, 246, 0.14);
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.28);
+}
+
+.toc-level-tag.level-2 {
+  opacity: 0.6;
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.toc-level-tag.level-3 {
+  opacity: 0.52;
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+.toc-level-tag.level-4 {
+  opacity: 0.45;
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+  border-color: rgba(139, 92, 246, 0.18);
+}
+
+.toc-level-tag.level-5 {
+  opacity: 0.4;
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border-color: rgba(107, 114, 128, 0.15);
+}
+
+.toc-level-tag.level-6 {
+  opacity: 0.35;
+  background: rgba(107, 114, 128, 0.08);
+  color: #9ca3af;
+  border-color: rgba(107, 114, 128, 0.12);
+}
+
+.toc-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mord {
   letter-spacing: 0.1em;
 }
