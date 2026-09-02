@@ -72,6 +72,32 @@ export class DocumentValidator {
   }
 
   /**
+   * 根据命令触发位置验证并获取 Markdown 文档
+   * @param resourceUri 编辑器标题栏或资源管理器传入的资源 URI
+   * @param showMessage 是否显示提示消息
+   * @returns 有效的 Markdown 文档或 undefined
+   */
+  static async validateMarkdownResource(
+    resourceUri?: vscode.Uri,
+    showMessage: boolean = true,
+  ): Promise<vscode.TextDocument | undefined> {
+    if (!resourceUri) {
+      return this.validateMarkdownDocument(undefined, showMessage)
+    }
+
+    try {
+      const document = await vscode.workspace.openTextDocument(resourceUri)
+      return this.validateMarkdownDocument(document, showMessage)
+    }
+    catch {
+      if (showMessage) {
+        ErrorHandler.showInfo('请先打开一个 Markdown 文件')
+      }
+      return undefined
+    }
+  }
+
+  /**
    * 检查文档是否有未保存的更改
    * @param document 文档
    * @returns 是否有未保存的更改

@@ -21,8 +21,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   // 注册 markdown 预览命令 - 侧边预览 (ViewColumn.Two)
   context.subscriptions.push(
-    vscode.commands.registerCommand('shikiMarkdownPreview.openPreviewSlide', () => {
-      const markdownDocument = DocumentValidator.validateMarkdownDocument()
+    vscode.commands.registerCommand('shikiMarkdownPreview.openPreviewSlide', async (resourceUri?: vscode.Uri) => {
+      const markdownDocument = await DocumentValidator.validateMarkdownResource(resourceUri)
       if (markdownDocument) {
         MarkdownPreviewPanel.createOrShowSlide(context.extensionUri, markdownDocument)
       }
@@ -31,8 +31,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   // 注册 markdown 预览命令 - 全屏预览 (ViewColumn.One)
   context.subscriptions.push(
-    vscode.commands.registerCommand('shikiMarkdownPreview.openPreviewFull', () => {
-      const markdownDocument = DocumentValidator.validateMarkdownDocument()
+    vscode.commands.registerCommand('shikiMarkdownPreview.openPreviewFull', async (resourceUri?: vscode.Uri) => {
+      const markdownDocument = await DocumentValidator.validateMarkdownResource(resourceUri)
       if (markdownDocument) {
         MarkdownPreviewPanel.createOrShowFull(context.extensionUri, markdownDocument)
       }
@@ -41,7 +41,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // 注册主题选择命令
   context.subscriptions.push(
-    vscode.commands.registerCommand('shikiMarkdownPreview.selectTheme', async () => {
+    vscode.commands.registerCommand('shikiMarkdownPreview.selectTheme', async (resourceUri?: vscode.Uri) => {
       // 优先检查预览面板是否存在
       if (MarkdownPreviewPanel.currentPanel) {
         // 如果预览面板存在，直接显示主题选择器
@@ -57,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       // 如果预览面板不存在，检查当前活动编辑器
-      const markdownDocument = DocumentValidator.validateMarkdownDocument()
+      const markdownDocument = await DocumentValidator.validateMarkdownResource(resourceUri)
       if (!markdownDocument)
         return
 
