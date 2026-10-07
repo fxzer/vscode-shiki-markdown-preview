@@ -296,7 +296,7 @@ export class MarkdownRenderer {
       return renderer.renderToken(tokens, idx, options)
     }
 
-    // 处理 Markdown 语法图片的相对路径与本地路径转换
+    // 处理 Markdown 语法图片与音视频的相对路径与本地路径转换
     const defaultImageRender = this._markdownIt.renderer.rules.image
       || ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
 
@@ -308,14 +308,59 @@ export class MarkdownRenderer {
         const originalSrc = token.attrs[srcIndex][1]
         const resolvedSrc = this.resolveImageSrc(originalSrc, this._currentDocument, this._currentWebview)
         token.attrs[srcIndex][1] = resolvedSrc
+
+        const alt = token.content || ''
+        const titleIndex = token.attrIndex('title')
+        const title = (titleIndex >= 0 && token.attrs[titleIndex]) ? token.attrs[titleIndex][1] : alt
+
+        // 智能识别 Markdown 语法中的视频文件，渲染为带控制条的原生 <video> 标签
+        if (this.isVideoUrl(originalSrc)) {
+          const escapedSrc = escapeHtml(resolvedSrc)
+          const escapedTitle = escapeHtml(title)
+          return `<video src="${escapedSrc}" controls preload="metadata" title="${escapedTitle}"></video>`
+        }
+
+        // 智能识别 Markdown 语法中的音频文件，渲染为带控制条的原生 <audio> 标签
+        if (this.isAudioUrl(originalSrc)) {
+          const escapedSrc = escapeHtml(resolvedSrc)
+          const escapedTitle = escapeHtml(title)
+          return `<audio src="${escapedSrc}" controls preload="metadata" title="${escapedTitle}"></audio>`
+        }
       }
 
       return defaultImageRender(tokens, idx, options, env, renderer)
     }
   }
 
+  // 常见视频格式扩展名
+  private static readonly VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.ogg', '.mov', '.m4v', '.ogv'])
+  // 常见音频格式扩展名
+  private static readonly AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.oga'])
+
   /**
-   * 解析图片路径为 Webview 可访问的 URI
+   * 判断 URL 是否为视频文件
+   */
+  private isVideoUrl(url: string): boolean {
+    if (!url)
+      return false
+    const clean = url.split(/[?#]/)[0].toLowerCase()
+    const ext = path.extname(clean)
+    return MarkdownRenderer.VIDEO_EXTENSIONS.has(ext)
+  }
+
+  /**
+   * 判断 URL 是否为音频文件
+   */
+  private isAudioUrl(url: string): boolean {
+    if (!url)
+      return false
+    const clean = url.split(/[?#]/)[0].toLowerCase()
+    const ext = path.extname(clean)
+    return MarkdownRenderer.AUDIO_EXTENSIONS.has(ext)
+  }
+
+  /**
+   * 解析图片/多媒体路径为 Webview 可访问的 URI
    */
   resolveImageSrc(src: string, document?: vscode.TextDocument, webview?: vscode.Webview): string {
     if (!src || typeof src !== 'string') {
@@ -337,7 +382,7 @@ export class MarkdownRenderer {
     }
 
     try {
-      // 提取 hash 和 query 参数（如 ./image.png?v=1#preview）
+      // 提取 hash 和 query 参数（如 ./video.mp4?v=1#preview）
       let cleanPath = trimmed
       let suffix = ''
       const hashIndex = cleanPath.indexOf('#')
@@ -385,21 +430,22 @@ export class MarkdownRenderer {
       }
     }
     catch {
-      ErrorHandler.logWarning(`图片路径解析失败: ${src}`, 'MarkdownRenderer')
+      ErrorHandler.logWarning(`多媒体路径解析失败: ${src}`, 'MarkdownRenderer')
     }
 
     return trimmed
   }
 
   /**
-   * 将 HTML 文本中的 <img> 标签的本地 src 解析为 Webview URI
+   * 将 HTML 文本中的 <img>, <video>, <audio>, <source> 标签的本地 src / poster 解析为 Webview URI
    */
-  private resolveHtmlImages(html: string, document?: vscode.TextDocument, webview?: vscode.Webview): string {
+  private resolveHtmlMedia(html: string, document?: vscode.TextDocument, webview?: vscode.Webview): string {
     if (!document || !webview || !html) {
       return html
     }
 
-    return html.replace(/<img\b([^>]*)>/gi, (imgTag, attrs) => {
+    // 1. 替换 <img src="...">
+    let processed = html.replace(/<img\b([^>]*)>/gi, (imgTag, attrs) => {
       const srcMatch = attrs.match(/\bsrc=(["'])(.*?)\1/i)
       if (!srcMatch) {
         return imgTag
@@ -413,6 +459,69 @@ export class MarkdownRenderer {
       const newAttrs = attrs.replace(srcMatch[0], newSrcAttr)
       return `<img${newAttrs}>`
     })
+
+    // 2. 替换 <video src="..." poster="...">
+    processed = processed.replace(/<video\b([^>]*)>/gi, (videoTag, attrs) => {
+      let newAttrs = attrs
+      // 替换 src
+      const srcMatch = newAttrs.match(/\bsrc=(["'])(.*?)\1/i)
+      if (srcMatch) {
+        const resolvedSrc = this.resolveImageSrc(srcMatch[2], document, webview)
+        if (resolvedSrc !== srcMatch[2]) {
+          newAttrs = newAttrs.replace(srcMatch[0], `src=${srcMatch[1]}${resolvedSrc}${srcMatch[1]}`)
+        }
+      }
+      // 替换 poster (视频封面)
+      const posterMatch = newAttrs.match(/\bposter=(["'])(.*?)\1/i)
+      if (posterMatch) {
+        const resolvedPoster = this.resolveImageSrc(posterMatch[2], document, webview)
+        if (resolvedPoster !== posterMatch[2]) {
+          newAttrs = newAttrs.replace(posterMatch[0], `poster=${posterMatch[1]}${resolvedPoster}${posterMatch[1]}`)
+        }
+      }
+      return `<video${newAttrs}>`
+    })
+
+    // 3. 替换 <source src="...">
+    processed = processed.replace(/<source\b([^>]*)>/gi, (sourceTag, attrs) => {
+      const srcMatch = attrs.match(/\bsrc=(["'])(.*?)\1/i)
+      if (!srcMatch) {
+        return sourceTag
+      }
+      const originalSrc = srcMatch[2]
+      const resolvedSrc = this.resolveImageSrc(originalSrc, document, webview)
+      if (resolvedSrc === originalSrc) {
+        return sourceTag
+      }
+      const newSrcAttr = `src=${srcMatch[1]}${resolvedSrc}${srcMatch[1]}`
+      const newAttrs = attrs.replace(srcMatch[0], newSrcAttr)
+      return `<source${newAttrs}>`
+    })
+
+    // 4. 替换 <audio src="...">
+    processed = processed.replace(/<audio\b([^>]*)>/gi, (audioTag, attrs) => {
+      const srcMatch = attrs.match(/\bsrc=(["'])(.*?)\1/i)
+      if (!srcMatch) {
+        return audioTag
+      }
+      const originalSrc = srcMatch[2]
+      const resolvedSrc = this.resolveImageSrc(originalSrc, document, webview)
+      if (resolvedSrc === originalSrc) {
+        return audioTag
+      }
+      const newSrcAttr = `src=${srcMatch[1]}${resolvedSrc}${srcMatch[1]}`
+      const newAttrs = attrs.replace(srcMatch[0], newSrcAttr)
+      return `<audio${newAttrs}>`
+    })
+
+    return processed
+  }
+
+  /**
+   * 兼容旧版方法名
+   */
+  private resolveHtmlImages(html: string, document?: vscode.TextDocument, webview?: vscode.Webview): string {
+    return this.resolveHtmlMedia(html, document, webview)
   }
 
   /**

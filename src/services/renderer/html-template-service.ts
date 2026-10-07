@@ -72,13 +72,17 @@ export class HTMLTemplateService {
             <html lang="en" data-markdown-theme-type="${markdownThemeType}">
             <head>
                 <meta charset="UTF-8">
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: http: data: blob:; script-src 'nonce-${nonce}'; connect-src https:;">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: http: data: blob:; media-src ${webview.cspSource} https: http: data: blob:; frame-src https: http:; child-src https: http:; script-src 'nonce-${nonce}'; connect-src https:;">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <link href="${webviewCssUri}" rel="stylesheet">
                 <link href="${searchCssUri}" rel="stylesheet">${katexCSS}
-                <style>
+                <style id="shiki-theme-css-vars">
                     :root {
                         ${themeCSSVariables}
+                    }
+                </style>
+                <style>
+                    :root {
                         --document-width: ${documentWidth};
                         --font-family: ${fontFamily};
                     }

@@ -60,6 +60,33 @@ function initializeSearchHighlight() {
 }
 
 /**
+ * 动态就地热更新主题样式（CSS 变量与外观类型）
+ */
+function applyThemeStyles(themeCSSVariables, themeType) {
+  if (themeCSSVariables) {
+    let themeStyleEl = document.getElementById('shiki-theme-css-vars')
+    if (!themeStyleEl) {
+      themeStyleEl = document.createElement('style')
+      themeStyleEl.id = 'shiki-theme-css-vars'
+      document.head.appendChild(themeStyleEl)
+    }
+    themeStyleEl.textContent = `:root {\n${themeCSSVariables}\n}`
+  }
+
+  if (themeType) {
+    const prevType = document.documentElement.getAttribute('data-markdown-theme-type')
+    document.documentElement.setAttribute('data-markdown-theme-type', themeType)
+
+    // 若外观模式切换且存在 Mermaid，重新初始化 Mermaid 适配新模式
+    if (prevType !== themeType && window.reinitializeMermaid) {
+      window.reinitializeMermaid().catch((err) => {
+        console.error('Mermaid reinitialization failed:', err)
+      })
+    }
+  }
+}
+
+/**
  * 处理来自扩展的消息
  */
 function handleExtensionMessage(event) {
@@ -81,9 +108,9 @@ function handleExtensionMessage(event) {
         window.tocConfig = {
           expandTocByDefault: Boolean(message.expandTocByDefault),
         }
-        if (message.markdownThemeType) {
-          document.documentElement.setAttribute('data-markdown-theme-type', message.markdownThemeType)
-        }
+
+        // 应用主题 CSS 变量与主题类型
+        applyThemeStyles(message.themeCSSVariables, message.markdownThemeType)
 
         markdownContent.innerHTML = message.content
 
@@ -209,8 +236,8 @@ function handleExtensionMessage(event) {
       break
     }
     case 'updateTheme': {
-      // 更新主题类型属性
-      document.documentElement.setAttribute('data-markdown-theme-type', message.themeType)
+      // 应用主题 CSS 变量与主题类型
+      applyThemeStyles(message.themeCSSVariables, message.themeType)
 
       // 重新初始化 Mermaid 以应用新主题
       if (window.reinitializeMermaid && window.renderMermaidDiagrams) {

@@ -386,6 +386,28 @@ img {
   filter: brightness(1.02);
 }
 
+/* 视频与音频播放器样式 */
+video,
+audio {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.375rem rgba(0, 0, 0, 0.15);
+  margin: 0.75rem 0;
+  display: block;
+}
+
+video {
+  background-color: #000000;
+  outline: none;
+}
+
+iframe {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--markdown-table-border, rgba(128, 128, 128, 0.2));
+  margin: 0.75rem 0;
+}
+
 /* 文本强调元素样式 */
 strong,
 b {
@@ -852,7 +874,9 @@ blockquote p:last-child {
   background: rgba(128, 128, 128, 0.15);
   color: var(--editor-foreground, var(--vscode-foreground));
   border: 1px solid rgba(128, 128, 128, 0.2);
-  transition: opacity 0.2s ease, background-color 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .toc-item:hover .toc-level-tag {

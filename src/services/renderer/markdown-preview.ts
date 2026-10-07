@@ -219,15 +219,29 @@ export class MarkdownPreviewPanel {
     // 根据视图变化更新内容
     this._panel.onDidChangeViewState(
       () => {
-        if (this._panel.visible && this._currentDocument) {
-          // 只有在文档版本发生变化时才重新渲染，避免不必要的闪烁
-          const currentVersion = this._currentDocument.version
-          if (this._lastRenderedDocumentVersion !== currentVersion) {
-            ErrorHandler.safeExecuteSync(
-              () => this.updateContentDebounced(this._currentDocument!),
-              '视图状态变化时内容更新失败',
+        if (this._panel.visible) {
+          // 检查外观主题自愈补偿（系统休眠唤醒、外观自动跟随或后台切回前台）
+          const effectiveTheme = this._themeService.effectiveTheme
+          if (this._themeService.autoDetectColorSchemeEnabled
+            && (effectiveTheme !== this._themeService.currentTheme || effectiveTheme !== this._lastRenderedTheme)) {
+            ErrorHandler.safeExecute(
+              () => this.handleThemeChange(),
+              '视图恢复可见时主题同步失败',
               'MarkdownPreviewPanel',
             )
+            return
+          }
+
+          // 只有在文档版本发生变化时才重新渲染，避免不必要的闪烁
+          if (this._currentDocument) {
+            const currentVersion = this._currentDocument.version
+            if (this._lastRenderedDocumentVersion !== currentVersion) {
+              ErrorHandler.safeExecuteSync(
+                () => this.updateContentDebounced(this._currentDocument!),
+                '视图状态变化时内容更新失败',
+                'MarkdownPreviewPanel',
+              )
+            }
           }
         }
       },
@@ -621,6 +635,7 @@ export class MarkdownPreviewPanel {
         content: renderedContent,
         frontMatterData,
         markdownThemeType: currentThemeType,
+        themeCSSVariables,
         expandTocByDefault: this.getTocExpandSetting(),
       })
 
@@ -753,7 +768,7 @@ export class MarkdownPreviewPanel {
 
     try {
       const nextTheme = this._themeService.effectiveTheme
-      if (nextTheme === this._themeService.currentTheme) {
+      if (nextTheme === this._themeService.currentTheme && nextTheme === this._lastRenderedTheme) {
         return
       }
 

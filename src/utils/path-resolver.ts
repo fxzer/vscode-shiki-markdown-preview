@@ -23,6 +23,14 @@ export class PathResolver {
     '.gif',
     '.svg',
     '.webp',
+    '.mp4',
+    '.webm',
+    '.ogg',
+    '.mov',
+    '.m4v',
+    '.mp3',
+    '.wav',
+    '.m4a',
   ]
 
   // 非法字符正则表达式
