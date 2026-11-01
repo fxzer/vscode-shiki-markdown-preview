@@ -1,4 +1,5 @@
 import type { ThemeService } from '../theme/theme-service'
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { container } from '@mdit/plugin-container'
 import { katex } from '@mdit/plugin-katex'
@@ -412,16 +413,95 @@ export class MarkdownRenderer {
       }
 
       let targetUri: vscode.Uri | null = null
+      const docDir = path.dirname(document.fileName)
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)
 
       if (path.isAbsolute(cleanPath)) {
-        // 绝对路径（POSIX: /Users/... 或 Windows: C:\...）
-        targetUri = vscode.Uri.file(cleanPath)
+        // 1. 如果系统绝对路径真实存在，直接使用
+        if (fs.existsSync(cleanPath)) {
+          targetUri = vscode.Uri.file(cleanPath)
+        }
+        else {
+          // 2. 很多 Markdown 规范将以 / 开头的路径视为相对于工作区根目录（Root-relative）
+          if (workspaceFolder) {
+            const relToWorkspace = path.resolve(workspaceFolder.uri.fsPath, cleanPath.replace(/^\/+/, ''))
+            if (fs.existsSync(relToWorkspace)) {
+              targetUri = vscode.Uri.file(relToWorkspace)
+            }
+          }
+          // 兜底回退为绝对路径 URI
+          if (!targetUri) {
+            targetUri = vscode.Uri.file(cleanPath)
+          }
+        }
       }
       else {
-        // 相对路径：相对于当前文档目录
-        const docDir = path.dirname(document.fileName)
+        // 相对路径解析逻辑：
+        // 策略 1：严格相对于当前文档目录解析（最高优先级）
         const resolvedPath = path.resolve(docDir, cleanPath)
-        targetUri = vscode.Uri.file(resolvedPath)
+
+        if (fs.existsSync(resolvedPath)) {
+          targetUri = vscode.Uri.file(resolvedPath)
+        }
+        else {
+          let foundPath: string | null = null
+
+          // 策略 2：向上逐级回溯查找父级目录
+          // 核心应用场景：Markdown 文件放在 final/、drafts/、docs/、sources/ 等子目录中，
+          // 但作者直接以 assets/xxx.png 或 images/xxx.png 引用文章根目录下的资产
+          let currentDir = docDir
+          const stopDir = workspaceFolder ? workspaceFolder.uri.fsPath : path.parse(docDir).root
+
+          for (let depth = 0; depth < 5; depth++) {
+            const parentDir = path.dirname(currentDir)
+            if (!parentDir || parentDir === currentDir) {
+              break
+            }
+            const candidate = path.resolve(parentDir, cleanPath)
+            if (fs.existsSync(candidate)) {
+              foundPath = candidate
+              break
+            }
+            if (currentDir === stopDir) {
+              break
+            }
+            currentDir = parentDir
+          }
+
+          // 策略 3：如果向上逐级回溯未命中，尝试相对于工作区根目录解析
+          if (!foundPath && workspaceFolder) {
+            const candidateFromWorkspace = path.resolve(workspaceFolder.uri.fsPath, cleanPath)
+            if (fs.existsSync(candidateFromWorkspace)) {
+              foundPath = candidateFromWorkspace
+            }
+          }
+
+          // 策略 4：常见资产目录智能模糊匹配（如只写了 assets/foo.png，或者在父级的 assets/、images/ 中）
+          if (!foundPath) {
+            const filename = path.basename(cleanPath)
+            const candidateBaseDirs = [
+              docDir,
+              path.dirname(docDir),
+              path.dirname(path.dirname(docDir)),
+              ...(workspaceFolder ? [workspaceFolder.uri.fsPath] : []),
+            ]
+            const subDirNames = ['assets', 'images', 'image', 'imgs', 'attachments', 'media', 'static', 'public', '.assets']
+            for (const baseDir of candidateBaseDirs) {
+              for (const sub of subDirNames) {
+                const candidate = path.join(baseDir, sub, filename)
+                if (fs.existsSync(candidate)) {
+                  foundPath = candidate
+                  break
+                }
+              }
+              if (foundPath) {
+                break
+              }
+            }
+          }
+
+          targetUri = vscode.Uri.file(foundPath || resolvedPath)
+        }
       }
 
       if (targetUri) {
@@ -522,6 +602,68 @@ export class MarkdownRenderer {
    */
   private resolveHtmlImages(html: string, document?: vscode.TextDocument, webview?: vscode.Webview): string {
     return this.resolveHtmlMedia(html, document, webview)
+  }
+
+  /**
+   * 将 Obsidian 风格的维基图片语法 ![[...]] 转换为标准 HTML 多媒体标签
+   * 支持:
+   * ![[image.png]]
+   * ![[image.png|300]] -> 指定宽度
+   * ![[image.png|300x200]] -> 指定宽高
+   * ![[image.png|说明文字]] -> 指定 alt
+   */
+  private processWikiLinks(content: string): string {
+    if (!content || !content.includes('![[')) {
+      return content
+    }
+
+    return content.replace(/!\[\[([^\]\n]+)\]\]/g, (match, inner) => {
+      const parts = inner.split('|')
+      const target = parts[0].trim()
+      if (!target) {
+        return match
+      }
+
+      const param = parts[1] ? parts[1].trim() : ''
+
+      const cleanTarget = target.split(/[?#]/)[0].toLowerCase()
+      const ext = path.extname(cleanTarget)
+      const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico', '.avif'].includes(ext)
+      const isVideo = MarkdownRenderer.VIDEO_EXTENSIONS.has(ext)
+      const isAudio = MarkdownRenderer.AUDIO_EXTENSIONS.has(ext)
+
+      if (!isImage && !isVideo && !isAudio) {
+        return match
+      }
+
+      if (isVideo) {
+        return `<video src="${escapeHtml(target)}" controls preload="metadata"></video>`
+      }
+
+      if (isAudio) {
+        return `<audio src="${escapeHtml(target)}" controls preload="metadata"></audio>`
+      }
+
+      let widthAttr = ''
+      let heightAttr = ''
+      let altText = ''
+
+      if (/^\d+$/.test(param)) {
+        widthAttr = ` width="${param}"`
+      }
+      else {
+        const sizeMatch = param.match(/^(\d+)x(\d+)$/i)
+        if (sizeMatch) {
+          widthAttr = ` width="${sizeMatch[1]}"`
+          heightAttr = ` height="${sizeMatch[2]}"`
+        }
+        else if (param) {
+          altText = escapeHtml(param)
+        }
+      }
+
+      return `<img src="${escapeHtml(target)}" alt="${altText}"${widthAttr}${heightAttr}>`
+    })
   }
 
   /**
@@ -787,8 +929,16 @@ export class MarkdownRenderer {
       this._markdownIt.renderer.rules.code_block = (tokens, idx, options, env, renderer) =>
         addLineNumber(tokens, idx, options, env, renderer, 'code_block')
 
-      this._markdownIt.renderer.rules.fence = (tokens, idx, options, env, renderer) =>
-        addLineNumber(tokens, idx, options, env, renderer, 'fence')
+      this._markdownIt.renderer.rules.fence = (tokens, idx, options, env, renderer) => {
+        const rendered = addLineNumber(tokens, idx, options, env, renderer, 'fence')
+        const line = tokens[idx].attrGet?.('data-line')
+        // markdown-it 对 highlight 返回 <pre 开头的输出会原样透传并丢弃 token.attrs，
+        // Shiki 高亮的代码块因此丢失 data-line 锚点，这里把行号重新注入到 <pre> 与每个代码行
+        if (line && rendered.startsWith('<pre')) {
+          return this.injectFenceLineAnchors(rendered, Number(line))
+        }
+        return rendered
+      }
 
       this._markdownIt.renderer.rules.table_open = (tokens, idx, options, env, renderer) =>
         addLineNumber(tokens, idx, options, env, renderer, 'table_open')
@@ -806,8 +956,11 @@ export class MarkdownRenderer {
         addLineNumber(tokens, idx, options, env, renderer, 'dd_open')
 
       try {
+        // 预处理 Obsidian 维基图片与多媒体链接语法 ![[...]]
+        const processedMarkdownContent = this.processWikiLinks(markdownContent)
+
         // 渲染 HTML
-        const html = this._markdownIt.render(markdownContent)
+        const html = this._markdownIt.render(processedMarkdownContent)
 
         // 验证 data-line 属性的完整性
         this.validateLineMapping(html, lines.length)
@@ -872,6 +1025,21 @@ export class MarkdownRenderer {
 
   get markdownIt(): MarkdownIt | undefined {
     return this._markdownIt
+  }
+
+  /**
+   * 为 Shiki 高亮输出的代码块注入行号锚点。
+   * fence 块的 data-line 锚定围栏行（token.map[0]），内容行从围栏行 + 1 起逐行递增，
+   * 保证滚动到长代码块内部时仍能命中精确的滚动同步锚点。
+   * 代码内容中的字面量已被 HTML 转义（&lt; 等），不会与真实的 <span 标签混淆。
+   */
+  private injectFenceLineAnchors(html: string, fenceLine: number): string {
+    let currentLine = fenceLine + 1
+    const withLineAnchors = html.replace(/<span class="line([^"]*)"/g, (_match: string, extra: string) => {
+      return `<span class="line${extra}" data-line="${currentLine++}"`
+    })
+    // 只需替换开头的 <pre（replace 非全局仅替换首次出现）
+    return withLineAnchors.replace('<pre', `<pre data-line="${fenceLine}"`)
   }
 
   /**

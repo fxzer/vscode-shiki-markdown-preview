@@ -46,6 +46,17 @@ function initializeScrollSync() {
 }
 
 /**
+ * 重新挂载滚动同步对 [data-line] 元素的观察。
+ * Mermaid 等异步渲染会替换 DOM 节点，渲染完成后由对应模块调用。
+ */
+function reobserveScrollSyncElements() {
+  if (scrollSyncManager && scrollSyncManager.reobserveElements) {
+    scrollSyncManager.reobserveElements()
+  }
+}
+window.reobserveScrollSyncElements = reobserveScrollSyncElements
+
+/**
  * 初始化搜索高亮
  */
 function initializeSearchHighlight() {

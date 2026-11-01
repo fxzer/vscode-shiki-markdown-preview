@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { HTMLTemplateService } from './html-template-service'
 import { MarkdownPreviewPanel } from './markdown-preview'
 
 export interface WebviewState {
@@ -11,14 +12,9 @@ export class MarkdownPreviewSerializer implements vscode.WebviewPanelSerializer 
   constructor(private extensionUri: vscode.Uri) {}
 
   async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, _state: WebviewState | undefined) {
-    // 设置 webview 选项
-    webviewPanel.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(this.extensionUri, 'src/webview'),
-        vscode.Uri.joinPath(this.extensionUri, 'src/webview/modules'),
-      ],
-    }
+    // 设置 webview 选项，动态赋予资源根目录权限
+    const docUri = _state?.documentUri ? vscode.Uri.parse(_state.documentUri) : undefined
+    webviewPanel.webview.options = HTMLTemplateService.getWebviewOptions(this.extensionUri, docUri)
 
     // 恢复面板
     MarkdownPreviewPanel.revive(webviewPanel, this.extensionUri)

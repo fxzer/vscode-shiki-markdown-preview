@@ -64,6 +64,12 @@ async function renderMermaidDiagrams() {
     for (const codeBlock of mermaidCodeBlocks) {
       await renderSingleMermaidDiagram(codeBlock, mermaid)
     }
+
+    // 替换 <pre> 节点后，滚动同步的 IntersectionObserver 已丢失对旧节点的观察，
+    // 通知主模块基于新 DOM 重新挂载观察
+    if (typeof window !== 'undefined' && window.reobserveScrollSyncElements) {
+      window.reobserveScrollSyncElements()
+    }
   }
   catch (error) {
     console.error('Mermaid diagram rendering failed:', error)
@@ -94,6 +100,12 @@ async function renderSingleMermaidDiagram(codeBlock, mermaid) {
     graphContainer.className = 'mermaid-graph'
     graphContainer.innerHTML = svg
 
+    // 保留原代码块上的 data-line 锚点，滚动同步依赖它定位
+    const dataLine = parentPre.getAttribute('data-line')
+    if (dataLine !== null) {
+      graphContainer.setAttribute('data-line', dataLine)
+    }
+
     // 用图表容器替换原始的代码块
     parentPre.parentNode.replaceChild(graphContainer, parentPre)
   }
@@ -107,6 +119,12 @@ async function renderSingleMermaidDiagram(codeBlock, mermaid) {
       <strong>Mermaid 图表渲染失败</strong><br>
       ${escapeHtml(error.message)}
     `
+
+    // 保留原代码块上的 data-line 锚点，滚动同步依赖它定位
+    const dataLine = parentPre.getAttribute('data-line')
+    if (dataLine !== null) {
+      errorDiv.setAttribute('data-line', dataLine)
+    }
 
     parentPre.parentNode.replaceChild(errorDiv, parentPre)
   }

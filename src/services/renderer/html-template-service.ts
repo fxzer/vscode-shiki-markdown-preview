@@ -195,10 +195,20 @@ export class HTMLTemplateService {
       }
     }
 
-    // 允许访问当前 Markdown 文件所在目录
+    // 允许访问当前 Markdown 文件所在目录及其各级祖先目录
+    // 覆盖父级 assets、images、工程根目录，杜绝 Webview 403 权限拦截
     if (documentUri) {
-      const documentDir = vscode.Uri.joinPath(documentUri, '..')
-      roots.push(documentDir)
+      let currentDir = vscode.Uri.joinPath(documentUri, '..')
+      roots.push(currentDir)
+
+      for (let i = 0; i < 5; i++) {
+        const parentDir = vscode.Uri.joinPath(currentDir, '..')
+        if (parentDir.fsPath === currentDir.fsPath) {
+          break
+        }
+        roots.push(parentDir)
+        currentDir = parentDir
+      }
     }
 
     return {
